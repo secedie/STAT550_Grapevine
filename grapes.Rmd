@@ -73,7 +73,7 @@ print(merlot2020[0,])
 
 ## Veraison
 
-We know from the client that the veraison column indicates the number days into August in each respective year when 50% of the berries on a given vine had reached 50%. The missing entries are a result of the vines reaching 50% veraison on the first day of measurement. They are missing not at random (MNAR) as whether this value is missing for each vine is dependent on this particular value. More specifically, if any of the missing values were recorded, it must be negative.
+We know from the client that the veraison column indicates the number days into August in each respective year when 50% of the berries on a given vine had changed to red. The missing entries are a result of the vines reaching 50% veraison on the first day of measurement. They are missing not at random (MNAR) as whether this value is missing for each vine is dependent on this particular value. More specifically, if any of the missing values were recorded, it must be negative.
 
 While imputation seems like a reasonable approach, since we know these values must be negative, we can take the maximum between each imputed value and zero to produce complete data sets?
 
@@ -85,7 +85,7 @@ c(mean(is.na(merlot2019$veraison)), mean(is.na(merlot2020$veraison)))
 
 ## Bloom
 
-Similar to veraison, the bloom column includes values that that indicate the number of days into June in each respective year when 50% of the flowers on a given vine had started to bloom. The missing entries are a result of the vines reaching 50% bloom on the first day of measurement. They are also missing not at random (MNAR). 
+Similar to veraison, the bloom column includes values that indicate the number of days into June in each respective year when 50% of the flowers on a given vine had started to bloom. The missing entries are a result of the vines reaching 50% bloom on the first day of measurement. They are also missing not at random (MNAR). 
 
 Again, we can consider taking the maximum between each imputed value and zero to produce complete data sets.
 
@@ -250,3 +250,81 @@ merlot2019 # this is now complete
 complete(merlot2020mice, 1) # first (out of 5) imputed data set for merlot2020 using all responses including the filled-in zeros
 complete(merlot2020miceNoZero, 1) # first (out of 5) imputed data set for merlot2020 without the filled-in zeros
 ```
+
+## Check for correlations 
+```{r}
+library(tidyverse)
+library(corrplot)
+```
+
+### chardonnay 2019
+```{r}
+char2019.resp <- select(chardonnay2019,(-1:-5))
+cor(char2019.resp)
+```
+From the output of correlation function, there seem no correlations between response variables.
+
+### chardonnay 2020
+```{r}
+char2019.resp <- select(chardonnay2020, (-1:-5))
+cor(char2019.resp)
+```
+Yield is found to be positively correlated with number of clusters.
+
+
+### merlot 2019
+```{r}
+merlot2019.resp <- select(merlot2019,(-1:-5))
+
+cor<-cor(merlot2019.resp)
+corrplot(cor,type = "upper", order = "hclust", tl.col = "black", tl.srt = 45, addCoef.col="white", number.cex=0.7)
+cor
+```
+
+We found out there are a few response variables are correlated: 
+berry.TA and berry.PH: -0.5513 (ignorable)
+cluster number and yield: 0.6132 (ignorable)
+pruning weight and Ravaz.index: -0.6060 (ignorable)
+yield and cluster weight: 0.8163
+yield and berries.cluster: 0.7482
+cluster weight and berries cluster: 0.9518
+
+As cluster weight = yield/cluster number, and berries.cluster = cluster weight/berry weight. Hence, yield, cluster weight and berries cluster are associated. It is reasonable to include only one variable in analysis: cluster weight?
+
+### merlot2020
+- merlot2020 using all responses including the filled-in zeros
+```{r}
+merlot2020mice.resp <- select(complete(merlot2020mice, 1),(-1:-5))
+cor<-cor(merlot2020mice.resp)
+corrplot(cor,type = "upper", order = "hclust", tl.col = "black", tl.srt = 45, addCoef.col="white", number.cex=0.7)
+cor
+```
+cluster number and yield: 0.9264
+cluster number and berry.Brix -0.7146
+veraision and berry.TA 0.7138
+berry.TA and berry.Brix 0.76
+berry.TA and berry.PH 0.87
+berry weight and cluster weight 0.74
+cluster weight and berries.cluster 0.95
+berries.cluster and berry.Brix 0.74
+berry.Brix and berry PH 0.75
+
+again, berries.cluster = cluster weight/berry weight. keep just one variable: cluster weight?
+
+- merlot2020 using all responses without the filled-in zeros
+```{r}
+merlot2020nozero.resp <- select(complete(merlot2020miceNoZero, 1),(-1:-5))
+cor<-cor(merlot2020nozero.resp)
+corrplot(cor,type = "upper", order = "hclust", tl.col = "black", tl.srt = 45, addCoef.col="white", number.cex=0.7)
+cor
+```
+cluster weight and berries.cluster 0.95
+cluster number and yield 0.93
+
+The berries.cluster( = cluster weight/berry weight) and cluster weight are positively associated in merlot datasets for both years. We may need to keep only one of these two variables. In 2020, cluster number is highly correlated with yield, while in 2019, yield is correlated with cluster weight. It makes sense to keep yield only for both years.
+
+
+
+
+
+
