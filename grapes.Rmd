@@ -1,13 +1,13 @@
 ---
 title: "Grapevine"
 author: "Naitong Chen, Shirley Cui, Shannon Edie"
-output:
-  pdf_document: default
-  html_document: default
+output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(corrplot)
 ```
 
 # Data description
@@ -251,77 +251,288 @@ complete(merlot2020mice, 1) # first (out of 5) imputed data set for merlot2020 u
 complete(merlot2020miceNoZero, 1) # first (out of 5) imputed data set for merlot2020 without the filled-in zeros
 ```
 
-## Check for correlations 
-```{r}
-library(tidyverse)
-library(corrplot)
+## data preprocessing - PCA
+Basically, we have reduced the dimentions of the dataset down to four/three dimensions for merlot 2013/2014 using PCA.
+```{r, include=FALSE}
+# carry forward with the following data sets (response variables only)
+char2019.resp <- select(chardonnay2019,(-1:-5))
+char2020.resp <- select(chardonnay2020, (-1:-5))
+merlot2019.resp <- select(merlot2019,(-1:-5))
+merlot2020.resp <- select(complete(merlot2020mice, 1),(-1:-5))
 ```
 
+```{r, include=FALSE}
+# extracting features
+# 2019
+merlot2019.growth <- select(merlot2019.resp,(1:2))
+res <- prcomp(merlot2019.growth, center = TRUE, scale = TRUE)
+merlot2019.growth.pc <- res$x[,1]
+var_explained = (res$sdev^2/(sum(res$sdev^2)))[1] # 0.9577232
+
+merlot2019.yield <- select(merlot2019.resp,(3:7))
+res <- prcomp(merlot2019.yield, center = TRUE, scale = TRUE)
+merlot2019.yield.pc <- res$x[,1]
+var_explained = (res$sdev^2/(sum(res$sdev^2)))[1] # 0.9741755
+
+merlot2019.quality <- select(merlot2019.resp,(8:10))
+res <- prcomp(merlot2019.quality, center = TRUE, scale = TRUE)
+merlot2019.quality.pc <- res$x[,1]
+var_explained = (res$sdev^2/(sum(res$sdev^2)))[1] # 0.78826
+
+merlot2019.pruning <- select(merlot2019.resp,(11:12))
+res <- prcomp(merlot2019.pruning, center = TRUE, scale = TRUE)
+merlot2019.pruning.pc <- res$x[,1]
+var_explained = (res$sdev^2/(sum(res$sdev^2)))[1] # 0.9996358
+
+# 2020
+merlot2020.growth <- select(merlot2020.resp,c(1:4,13))
+res <- prcomp(merlot2020.growth, center = TRUE, scale = TRUE)
+merlot2020.growth.pc <- res$x[,1]
+var_explained = (res$sdev^2/(sum(res$sdev^2)))[1] # 0.7180542
+
+merlot2020.yield <- select(merlot2020.resp,(5:9))
+res <- prcomp(merlot2020.yield, center = TRUE, scale = TRUE)
+merlot2020.yield.pc <- res$x[,1]
+var_explained = (res$sdev^2/(sum(res$sdev^2)))[1] # 0.9821489
+
+merlot2020.quality <- select(merlot2020.resp,(10:12))
+res <- prcomp(merlot2020.quality, center = TRUE, scale = TRUE)
+merlot2020.quality.pc <- res$x[,1]
+var_explained = (res$sdev^2/(sum(res$sdev^2)))[1] # 0.8134009
+```
+
+
+```{r, include=FALSE}
+# putting together extracted datasets
+merlot2019.pca = cbind(merlot2019[-61:-65, 1:5], merlot2019.growth.pc, merlot2019.yield.pc,
+                            merlot2019.quality.pc, merlot2019.pruning.pc)
+merlot2019.pca = data.frame(merlot2019.pca)
+
+merlot2020.pca = cbind(merlot2020[-61:-65, 1:5], merlot2020.growth.pc, merlot2020.yield.pc,
+                            merlot2020.quality.pc)
+merlot2020.pca = data.frame(merlot2020.pca)
+```
+
+```{r, include=FALSE}
+# Now proceed with analysis using the following data sets
+chardonnay2019
+chardonnay2020
+merlot2019.pca
+merlot2020.pca
+```
+
+# Check for correlations
+## Chardonnay dataset
 ### chardonnay 2019
 ```{r}
-char2019.resp <- select(chardonnay2019,(-1:-5))
-cor(char2019.resp)
+chardonnay2019 %>% 
+  select(-1:-5) %>% 
+  cor() %>% 
+  corrplot(type = "upper", order = "hclust", tl.col = "black", tl.srt = 45, addCoef.col="white", number.cex=0.7)
 ```
 From the output of correlation function, there seem no correlations between response variables.
 
 ### chardonnay 2020
 ```{r}
-char2019.resp <- select(chardonnay2020, (-1:-5))
-cor(char2019.resp)
+chardonnay2020 %>% 
+  select(-1:-5) %>% 
+  cor() %>% 
+  corrplot(type = "upper", order = "hclust", tl.col = "black", tl.srt = 45, addCoef.col="white", number.cex=0.7)
 ```
 Yield is found to be positively correlated with number of clusters.
 
-
 ### merlot 2019
 ```{r}
-merlot2019.resp <- select(merlot2019,(-1:-5))
-
-cor<-cor(merlot2019.resp)
-corrplot(cor,type = "upper", order = "hclust", tl.col = "black", tl.srt = 45, addCoef.col="white", number.cex=0.7)
-cor
+merlot2019.pca %>% 
+  select(-1:-5) %>% 
+  cor() %>% 
+  corrplot(type = "upper", order = "hclust", tl.col = "black", tl.srt = 45, addCoef.col="white", number.cex=0.7)
 ```
-
-We found out there are a few response variables are correlated: 
-berry.TA and berry.PH: -0.5513 (ignorable)
-cluster number and yield: 0.6132 (ignorable)
-pruning weight and Ravaz.index: -0.6060 (ignorable)
-yield and cluster weight: 0.8163
-yield and berries.cluster: 0.7482
-cluster weight and berries cluster: 0.9518
-
-As cluster weight = yield/cluster number, and berries.cluster = cluster weight/berry weight. Hence, yield, cluster weight and berries cluster are associated. It is reasonable to include only one variable in analysis: cluster weight?
-
-### merlot2020
-- merlot2020 using all responses including the filled-in zeros
+### merlot 2020
 ```{r}
-merlot2020mice.resp <- select(complete(merlot2020mice, 1),(-1:-5))
-cor<-cor(merlot2020mice.resp)
-corrplot(cor,type = "upper", order = "hclust", tl.col = "black", tl.srt = 45, addCoef.col="white", number.cex=0.7)
-cor
+merlot2020.pca %>% 
+  select(-1:-5) %>% 
+  cor() %>% 
+  corrplot(type = "upper", order = "hclust", tl.col = "black", tl.srt = 45, addCoef.col="white", number.cex=0.7)
 ```
-cluster number and yield: 0.9264
-cluster number and berry.Brix -0.7146
-veraision and berry.TA 0.7138
-berry.TA and berry.Brix 0.76
-berry.TA and berry.PH 0.87
-berry weight and cluster weight 0.74
-cluster weight and berries.cluster 0.95
-berries.cluster and berry.Brix 0.74
-berry.Brix and berry PH 0.75
+From the correlation matrix plots, there seem to be no obvious correlations among the response variables in these four datasets. We are good to continue with normality and equal variance assumptions check.
 
-again, berries.cluster = cluster weight/berry weight. keep just one variable: cluster weight?
-
-- merlot2020 using all responses without the filled-in zeros
+## Check for assumption of ANOVA test: normality and equal variance
+### Chardonnay 2019 
+1. table of mean and variance under control and treatment for each response variable
 ```{r}
-merlot2020nozero.resp <- select(complete(merlot2020miceNoZero, 1),(-1:-5))
-cor<-cor(merlot2020nozero.resp)
-corrplot(cor,type = "upper", order = "hclust", tl.col = "black", tl.srt = 45, addCoef.col="white", number.cex=0.7)
-cor
+chardonnay2019 %>% 
+  group_by(block, treatment) %>% 
+  summarise(var.num_of_cluster=var(X..of.clusters),
+            mean.num_of_cluster=mean(X..of.clusters),
+            var.yield=var(yield..kg.),
+            mean.yield=mean(yield..kg.),
+            var.cluster_weight=var(av.cluster.weight..kg.),
+            mean.cluster_weight=mean(av.cluster.weight..kg.))
 ```
-cluster weight and berries.cluster 0.95
-cluster number and yield 0.93
 
-The berries.cluster( = cluster weight/berry weight) and cluster weight are positively associated in merlot datasets for both years. We may need to keep only one of these two variables. In 2020, cluster number is highly correlated with yield, while in 2019, yield is correlated with cluster weight. It makes sense to keep yield only for both years.
+2. Visualization (side by side boxplots for each response variable)
+```{r}
+## check assumptions of number of clusters
+chardonnay2019 %>% 
+  ggplot(aes(x=treatment, y = X..of.clusters, fill=treatment))+
+  scale_fill_manual(values=c("lightblue2", "seashell2"))+
+  geom_boxplot()+
+  labs(title = "number of clusters") +
+  ylab("number of clusters")+
+  facet_wrap(~block)
+
+## check assumptions of yield
+chardonnay2019 %>% 
+  ggplot(aes(x=treatment, y = yield..kg., fill=treatment)) +
+  scale_fill_manual(values=c("lightblue2", "seashell2"))+
+  geom_boxplot()+
+  labs(title = "yield") +
+  ylab("yield")+
+  facet_wrap(~block) 
+
+## check assumptions for average cluster weight
+chardonnay2019 %>% 
+  ggplot(aes(x=treatment, y = av.cluster.weight..kg., fill=treatment)) +
+  scale_fill_manual(values=c("lightblue2", "seashell2"))+
+  geom_boxplot()+
+  labs(title = "average cluster weight") +
+  ylab("average cluster weight")+
+  facet_wrap(~block) 
+```
+### Chardonnay 2020
+1. table of mean and variance under control and treatment for each response variable
+```{r}
+chardonnay2020 %>% 
+  group_by(block, treatment) %>% 
+  summarise(var.num_of_cluster=var(X..of.clusters),
+            mean.num_of_cluster=mean(X..of.clusters),
+            var.yield=var(yield..kg.),
+            mean.yield=mean(yield..kg.),
+            var.cluster_weight=var(av.cluster.weight..kg.),
+            mean.cluster_weight=mean(av.cluster.weight..kg.))
+```
+2. Visualization (side by side boxplots for each response variable)
+```{r}
+## check assumptions of number of clusters
+chardonnay2020 %>% 
+  ggplot(aes(x=treatment, y = X..of.clusters, fill=treatment))+
+  scale_fill_manual(values=c("lightblue2", "seashell2"))+
+  geom_boxplot()+
+  labs(title = "number of clusters") +
+  ylab("number of clusters")+
+  facet_wrap(~block)
+
+## check assumptions of yield
+chardonnay2020 %>% 
+  ggplot(aes(x=treatment, y = yield..kg., fill=treatment)) +
+  scale_fill_manual(values=c("lightblue2", "seashell2"))+
+  geom_boxplot()+
+  labs(title = "yield") +
+  ylab("yield")+
+  facet_wrap(~block) 
+
+## check assumptions for average cluster weight
+chardonnay2020 %>% 
+  ggplot(aes(x=treatment, y = av.cluster.weight..kg., fill=treatment)) +
+  scale_fill_manual(values=c("lightblue2", "seashell2"))+
+  geom_boxplot()+
+  labs(title = "average cluster weight") +
+  ylab("average cluster weight")+
+  facet_wrap(~block) 
+```
+### merlot 2019
+1. table of mean and variance under control and treatment for each response variable
+```{r}
+merlot2019.pca %>% 
+  group_by(block, treatment) %>% 
+  summarise(var.growth=var(merlot2019.growth.pc),
+            mean.growth=mean(merlot2019.growth.pc),
+            var.yield=var(merlot2019.yield.pc),
+            mean.yield=mean(merlot2019.yield.pc),
+            var.quality=var(merlot2019.quality.pc),
+            mean.quality=mean(merlot2019.quality.pc),
+            var.yield=var(merlot2019.pruning.pc),
+            mean.yield=mean(merlot2019.pruning.pc))
+
+```
+
+2. Visualization (side by side boxplots for each response variable)
+```{r}
+ggplot(merlot2019.pca, aes(x=treatment, y = merlot2019.growth.pc, fill=treatment)) +
+  scale_fill_manual(values=c("lightblue2", "seashell2"))+
+  geom_boxplot()+
+  labs(title = "growth") +
+  ylab("growth")+
+  facet_wrap(~block) 
+
+ggplot(merlot2019.pca, aes(x=treatment, y = merlot2019.yield.pc, fill=treatment)) +
+  scale_fill_manual(values=c("lightblue2", "seashell2"))+
+  geom_boxplot()+
+  labs(title = "yield") +
+  facet_wrap(~block) 
+
+ggplot(merlot2019.pca, aes(x=treatment, y = merlot2019.quality.pc, fill=treatment)) +
+  scale_fill_manual(values=c("lightblue2", "seashell2"))+
+  geom_boxplot()+
+  labs(title = "quality") +
+  facet_wrap(~block) 
+
+ggplot(merlot2019.pca, aes(x=treatment, y = merlot2019.pruning.pc, fill=treatment)) +
+  scale_fill_manual(values=c("lightblue2", "seashell2"))+
+  geom_boxplot()+
+  labs(title = "pruning") +
+  facet_wrap(~block) 
+```
+
+### merlot 2020
+1. table of mean and variance under control and treatment for each response variable
+```{r}
+merlot2020.pca %>% 
+  group_by(block, treatment) %>% 
+  summarise(var.growth=var(merlot2020.growth.pc),
+            mean.growth=mean(merlot2020.growth.pc),
+            var.yield=var(merlot2020.yield.pc),
+            mean.yield=mean(merlot2020.yield.pc),
+            var.quality=var(merlot2020.quality.pc),
+            mean.quality=mean(merlot2020.quality.pc))
+```
+
+2. Visualization (side by side boxplots for each response variable)
+```{r}
+ggplot(merlot2020.pca, aes(x=treatment, y = merlot2020.growth.pc, fill=treatment)) +
+  scale_fill_manual(values=c("lightblue2", "seashell2"))+
+  geom_boxplot()+
+  labs(title = "growth") +
+  ylab("growth")+
+  facet_wrap(~block) 
+
+ggplot(merlot2020.pca, aes(x=treatment, y = merlot2020.yield.pc, fill=treatment)) +
+  scale_fill_manual(values=c("lightblue2", "seashell2"))+
+  geom_boxplot()+
+  labs(title = "yield") +
+  facet_wrap(~block) 
+
+ggplot(merlot2020.pca, aes(x=treatment, y = merlot2020.quality.pc, fill=treatment)) +
+  scale_fill_manual(values=c("lightblue2", "seashell2"))+
+  geom_boxplot()+
+  labs(title = "quality") +
+  facet_wrap(~block) 
+```
+
+Based on the side-by-side box plots above, it seems that many outcome variables do not have equal variance, or the distribution is not quite normal. One limitation which can explain this is that our sample size is really small for each treatment in each block(5 or 6 datapoints). Hence, the plot cannot really tell much useful information about the data. 
+
+Below, wilcoxon rank tests can be performed to test whether the distribution in control and treatment groups are the same. (that would be a lot of tests... I only tried out the test for number of clusters in Char2019 for five blocks.)
+### randomization test
+chardonnay 2019
+```{r}
+for (i in unique(chardonnay2019$block)){
+  res=wilcox.test(chardonnay2019$X..of.clusters[chardonnay2019$block==i & chardonnay2019$treatment=="heat"],
+                  chardonnay2019$X..of.clusters[chardonnay2019$block==i & chardonnay2019$treatment=="control"],
+                  exact=FALSE)
+  print(res)
+}
+```
 
 
 
