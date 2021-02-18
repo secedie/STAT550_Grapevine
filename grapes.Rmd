@@ -1,7 +1,10 @@
 ---
 title: "Grapevine"
 author: "Naitong Chen, Shirley Cui, Shannon Edie"
-output: pdf_document
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
@@ -229,7 +232,7 @@ We therefore won't need to do imputation on veraison altogether, and so can proc
 ```{r, include=FALSE}
 merlot2019$veraison[is.na(merlot2019$veraison)] = 0
 
-merlot2020$veraison[is.na(merlot2020$veraison)] = 0
+merlot2020$veraison[which(is.na(merlot2020$veraison) & merlot2020$cluster.number > 0)] = 0
 
 predMatrix = matrix(rep(1,ncol(merlot2020)^2), ncol(merlot2020), ncol(merlot2020))
 diag(predMatrix) = 0
@@ -238,9 +241,9 @@ predMatrix[,4] = 0
 predMatrix[,5] = 0
 merlot2020mice = mice(data = merlot2020, predictorMatrix = predMatrix, seed = 1, method = "norm.predict")
 
-predMatrix[,c(11,14)] = 0
-predMatrix[,9] = 0
-merlot2020miceNoZero = mice(data = merlot2020, predictorMatrix = predMatrix, seed = 1, method = "norm.predict")
+# predMatrix[,c(11,14)] = 0
+# predMatrix[,9] = 0
+# merlot2020miceNoZero = mice(data = merlot2020, predictorMatrix = predMatrix, seed = 1, method = "norm.predict")
 ```
 
 Check out the imputed data sets in the code blocks!
@@ -248,7 +251,7 @@ Check out the imputed data sets in the code blocks!
 ```{r, include=FALSE}
 merlot2019 # this is now complete
 complete(merlot2020mice, 1) # first (out of 5) imputed data set for merlot2020 using all responses including the filled-in zeros
-complete(merlot2020miceNoZero, 1) # first (out of 5) imputed data set for merlot2020 without the filled-in zeros
+# complete(merlot2020miceNoZero, 1) # first (out of 5) imputed data set for merlot2020 without the filled-in zeros
 ```
 
 ## data preprocessing - PCA
@@ -534,8 +537,231 @@ for (i in unique(chardonnay2019$block)){
 }
 ```
 
+QQ plot for number of clusters in chardonnary 2019 (for each block/treatment combo)
 
+```{r, echo=FALSE}
+for (i in unique(chardonnay2019$block)){
+  qqnorm(chardonnay2019$X..of.clusters[chardonnay2019$block==i & chardonnay2019$treatment=="heat"])
+  qqline(chardonnay2019$X..of.clusters[chardonnay2019$block==i & chardonnay2019$treatment=="heat"], col = "red")
+  qqnorm(chardonnay2019$X..of.clusters[chardonnay2019$block==i & chardonnay2019$treatment=="control"])
+  qqline(chardonnay2019$X..of.clusters[chardonnay2019$block==i & chardonnay2019$treatment=="control"], col = "red")
+}
+```
 
+F test and randomization test for equal variance between treatments for each block in chardonnary 2019
+```{r, echo=FALSE}
+for (i in unique(chardonnay2019$block)){
+  res = var.test(chardonnay2019$X..of.clusters[chardonnay2019$block==i & chardonnay2019$treatment=="heat"], chardonnay2019$X..of.clusters[chardonnay2019$block==i & chardonnay2019$treatment=="control"])
+  print("F test")
+  print(res$p.value)
+  
+  # randomization test for equal variance
+  n = 2*length(chardonnay2019$X..of.clusters[chardonnay2019$block==i & chardonnay2019$treatment=="heat"])
+  n1 = length(chardonnay2019$X..of.clusters[chardonnay2019$block==i & chardonnay2019$treatment=="heat"])
+  totalComb <- combn(n, n1)
+  dim(totalComb)
+  
+  totalComb.complement <- matrix(nrow = dim(totalComb)[1], ncol = dim(totalComb)[2])
+  for (j in 1:dim(totalComb)[2]) {
+    totalComb.complement[,j] = (1:n)[-totalComb[,j]]
+  }
+  
+  # replace the indices by the actual value.
+  dat = chardonnay2019$X..of.clusters[chardonnay2019$block==i]
+  dat.mat <- matrix(dat[totalComb], ncol = choose(n, n1))
+  dat.mat.complement <- matrix(dat[totalComb.complement], ncol = choose(n, n1))
+  
+  # calculate the d_obs
+  d.obs <- abs(var(chardonnay2019$X..of.clusters[chardonnay2019$block==i & chardonnay2019$treatment=="heat"]) - var(chardonnay2019$X..of.clusters[chardonnay2019$block==i & chardonnay2019$treatment=="control"]))
+  
+  # calculate all other ds
+  abs.diff.var <- rep(0, dim(totalComb)[2])
+  for (j in 1:dim(totalComb)[2]) {
+    abs.diff.var[j] = abs(var(dat.mat[,j]) - var(dat.mat.complement[,j]))
+  }
 
+  c1 <- sum(abs.diff.var > d.obs)
+  c2 <- sum(abs.diff.var == d.obs)
+  p.val <- (c1 + 0.5*c2)/choose(n, n1)
+  print("rand test")
+  print(p.val)
+}
+```
 
+QQ plot for the growth PC in merlot 2020 (for each block/treatment combo)
 
+```{r, echo=FALSE}
+for (i in unique(merlot2020.pca$block)){
+  qqnorm(merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i & merlot2020.pca$treatment=="heat"])
+  qqline(merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i & merlot2020.pca$treatment=="heat"], col = "red")
+  qqnorm(merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i & merlot2020.pca$treatment=="control"])
+  qqline(merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i & merlot2020.pca$treatment=="control"], col = "red")
+}
+```
+
+F test and randomization test for equal variance between treatments for each block in merlot 2020
+```{r, echo=FALSE}
+for (i in unique(merlot2020.pca$block)){
+  res = var.test(merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i & merlot2020.pca$treatment=="heat"], merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i & merlot2020.pca$treatment=="control"])
+  print("F test")
+  print(res$p.value)
+  
+  # randomization test for equal variance
+  n = 2*length(merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i & merlot2020.pca$treatment=="heat"])
+  n1 = length(merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i & merlot2020.pca$treatment=="heat"])
+  totalComb <- combn(n, n1)
+  dim(totalComb)
+  
+  totalComb.complement <- matrix(nrow = dim(totalComb)[1], ncol = dim(totalComb)[2])
+  for (j in 1:dim(totalComb)[2]) {
+    totalComb.complement[,j] = (1:n)[-totalComb[,j]]
+  }
+  
+  # replace the indices by the actual value.
+  dat = merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i]
+  dat.mat <- matrix(dat[totalComb], ncol = choose(n, n1))
+  dat.mat.complement <- matrix(dat[totalComb.complement], ncol = choose(n, n1))
+  
+  # calculate the d_obs
+  d.obs <- abs(var(merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i & merlot2020.pca$treatment=="heat"]) - var(merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i & merlot2020.pca$treatment=="control"]))
+  
+  # calculate all other ds
+  abs.diff.var <- rep(0, dim(totalComb)[2])
+  for (j in 1:dim(totalComb)[2]) {
+    abs.diff.var[j] = abs(var(dat.mat[,j]) - var(dat.mat.complement[,j]))
+  }
+
+  c1 <- sum(abs.diff.var > d.obs)
+  c2 <- sum(abs.diff.var == d.obs)
+  p.val <- (c1 + 0.5*c2)/choose(n, n1)
+  print("rand test")
+  print(p.val)
+}
+```
+
+We see that the normality assumptions are slightly violated, and the equal variance assumptions are also violated even though we only compared variances between treatments within each block. Therefore we will use both a parametric and a non parametric test in the following analysis. (Should repeat the above for all other variables.)
+
+# Aligned rank transform ANOVA (nonparametric test for two-way layout)
+
+## Chardonnay 2019 number of clusters
+```{r, echo=FALSE}
+library(ARTool)
+dat = chardonnay2019
+model = art(X..of.clusters ~ treatment + block + treatment:block, data = dat)
+res = anova(model, type = 1)
+print(res)
+```
+
+## Chardonnay 2019 yield
+```{r, echo=FALSE}
+library(ARTool)
+dat = chardonnay2019
+model = art(yield..kg. ~ treatment + block + treatment:block, data = dat)
+res = anova(model, type = 1)
+print(res)
+```
+
+## Chardonnay 2019 average cluster weight
+```{r, echo=FALSE}
+library(ARTool)
+dat = chardonnay2019
+model = art(av.cluster.weight..kg. ~ treatment + block + treatment:block, data = dat)
+res = anova(model, type = 1)
+print(res)
+```
+
+## Chardonnay 2020 number of clusters
+```{r, echo=FALSE}
+library(ARTool)
+dat = chardonnay2020
+model = art(X..of.clusters ~ treatment + block + treatment:block, data = dat)
+res = anova(model, type = 1)
+print(res)
+```
+
+## Chardonnay 2020 yield
+```{r, echo=FALSE}
+library(ARTool)
+dat = chardonnay2020
+model = art(yield..kg. ~ treatment + block + treatment:block, data = dat)
+res = anova(model, type = 1)
+print(res)
+```
+
+## Chardonnay 2020 average cluster weight
+```{r, echo=FALSE}
+library(ARTool)
+dat = chardonnay2020
+model = art(av.cluster.weight..kg. ~ treatment + block + treatment:block, data = dat)
+res = anova(model, type = 1)
+print(res)
+```
+
+## Merlot 2019 growth PC
+```{r, echo=FALSE}
+library(ARTool)
+dat = merlot2019.pca
+model = art(merlot2019.growth.pc ~ treatment + block + treatment:block, data = dat)
+res = anova(model, type = 1)
+print(res)
+```
+
+## Merlot 2019 yield PC
+```{r, echo=FALSE}
+library(ARTool)
+dat = merlot2019.pca
+model = art(merlot2019.yield.pc ~ treatment + block + treatment:block, data = dat)
+res = anova(model, type = 1)
+print(res)
+```
+
+## Merlot 2019 quality PC
+```{r, echo=FALSE}
+library(ARTool)
+dat = merlot2019.pca
+model = art(merlot2019.quality.pc ~ treatment + block + treatment:block, data = dat)
+res = anova(model, type = 1)
+print(res)
+```
+
+## Merlot 2019 pruning PC
+```{r, echo=FALSE}
+library(ARTool)
+dat = merlot2019.pca
+model = art(merlot2019.pruning.pc ~ treatment + block + treatment:block, data = dat)
+res = anova(model, type = 1)
+print(res)
+```
+
+## Merlot 2020 growth PC
+```{r, echo=FALSE}
+library(ARTool)
+dat = merlot2020.pca
+model = art(merlot2020.growth.pc ~ treatment + block + treatment:block, data = dat)
+res = anova(model, type = 1)
+print(res)
+```
+
+## Merlot 2020 yield PC
+```{r, echo=FALSE}
+library(ARTool)
+dat = merlot2020.pca
+model = art(merlot2020.yield.pc ~ treatment + block + treatment:block, data = dat)
+res = anova(model, type = 1)
+print(res)
+```
+
+## Merlot 2020 quality PC
+```{r, echo=FALSE}
+library(ARTool)
+dat = merlot2020.pca
+model = art(merlot2020.quality.pc ~ treatment + block + treatment:block, data = dat)
+res = anova(model, type = 1)
+print(res)
+```
+
+None of the treatment effects are significant. Although some of the interaction effects are. Maybe heating only helps under certain geographical conditions? 
+
+Another thing to check is the actual estimate of the treatment/blocking/interaction effects. We can also construct SEs of each of these effects.
+
+Can also combine data from both years and do repeated measures ANOVA?
