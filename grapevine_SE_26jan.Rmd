@@ -131,9 +131,10 @@ for (i in 1:length(resp.char)) {
 
 ## Normality
 
-```{r}
+```{r qq.mer}
 
 # Check normality
+par(mfrow=c(4,4), mar=c(1,2,2,1))
 for (i in 1:length(resp.mer)) {
   qqnorm(mer[mer$treatment=="heat",which(names(mer)==resp.mer[i])], cex.main=0.9, main=resp.mer[i])
   qqline(mer[mer$treatment=="heat",which(names(mer)==resp.mer[i])], cex.main=0.9, main=resp.mer[i])
