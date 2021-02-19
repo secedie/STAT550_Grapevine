@@ -5,17 +5,28 @@ output:
   pdf_document: default
   html_document:
     df_print: paged
+editor_options: 
+  chunk_output_type: console
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r setup, include=TRUE, echo=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
 library(tidyverse)
 library(corrplot)
+library(icenReg) # for survival analysis
+library(knitr)
+library(lawstat) # for the levene test
 ```
+
+# Problem overview
+
+Agro-thermal heat-treatment technology in grapevines has been shown to increase yield, decrease the use of agro-chemicals used to fight pests, enhance wine quality and improve profits, but this technology has not been tested in the Okanagan Valley or Canada. Heat treatment is applied by driving a tractor through the vineyard rows that blows extreme heat into the canopy. During the growing seasons of 2019 and 2020, heat treatment was applied to a Merlot and a Chardonnay vineyard in the Okanagan valley six times during the growing season with application ten days apart from each other. Treatments were: (1) heat, and (2) control (no heat).
 
 # Data description
 
-```{r, include=FALSE}
+A full description of the recorded variables in the Chardonnay and Merlot studies can be seen in Figure \ref{var.descr.table}. The blocking structure, sample sizes, and a brief overview of missing data are explained below.
+
+```{r read.data.in, include=FALSE}
 merlot2020 = read.csv("TanjaVoegel_Merlot_2020_data.csv")
 merlot2019 = read.csv("TanjaVoegel_Merlot_2019_data.csv")
 chardonnay2019 = read.csv("TanjaVoegel_Chardonnay_2019_data.csv")
@@ -26,6 +37,9 @@ merlot2020 = merlot2020[-(61:65),]
 merlot2020 = merlot2020[,-(19:20)]
 merlot2019 = merlot2019[-(61:65),]
 merlot2019 = merlot2019[,-18]
+
+# Make sure the merlot column names are consistent
+colnames(merlot2020)[colnames(merlot2020)=="spad"] = "SPAD"
 
 # encode row, treatment, block, and subsample as factor
 chardonnay2019$row = as.factor(chardonnay2019$row)
@@ -47,32 +61,28 @@ merlot2020$row = as.factor(merlot2020$row)
 merlot2020$treatment = as.factor(merlot2020$treatment)
 merlot2020$block = as.factor(merlot2020$block)
 merlot2020$subsample = as.factor(merlot2020$subsample)
+
 ```
 
-## Chardonnay
 
-There are 40 samples in each of the chardonnay2019 and chardonnay2020 data set. The 40 samples consist of 8 samples from each of the 5 blocks. Among the 8 samples within each block, 4 samples of each treatment are included.
+```{r var.descr.table, echo=FALSE}
 
-Both datasets contain 3 measurements of each sample with no missing data.
+var.descr <- read.csv("Variable_descriptions.csv")
+kable(var.descr, caption="\\label{var.descr.table} Variable descriptions.")
 
-```{r, echo=FALSE}
-print(chardonnay2020[0,])
 ```
 
-## Merlot
+There are 40 samples in each of the Chardonnay 2019 and Chardonnay 2020 datasets. The 40 samples consist of 8 samples from each of the 5 blocks. Among the 8 samples within each block, 4 samples of each treatment are included.
 
-There are 60 samples in each of the merlot2019 and merlot2020 data set. The 60 samples consist of 10 samples from each of the 6 blocks. Among the 10 samples within each block, 5 samples of each treatment are included.
+Both Chardonnay datasets contain 3 measurements of each sample with no missing data.
 
-There are 10 measurements that are common between the two merlot data sets. In addition, merlot2020 contains measures of fruitfulness, bloom, and brown seed color. merlot2019 contains measures of pruning weight and ravaz index.
+There are 60 samples in each of the Merlot 2019 and Merlot 2020 datasets. The 60 samples consist of 10 samples from each of the 6 blocks. Among the 10 samples within each block, 5 samples of each treatment are included.
 
-In the merlot2019 data set, there are missing values from the measurement of veraison. In the merlot2020 data set, there are missing vales from the measurements of veraison, bloom, yield, cluster weight, berries/cluster, berry weight, berry Brix, berry TA, berry pH, and brown seed color.
+In the Merlot 2019 data set, there are missing values from the measurement of veraison. In the Merlot 2020 data set, there are missing vales from the measurements of veraison, bloom, yield, cluster weight, berries/cluster, berry weight, berry Brix, berry TA, berry pH, and brown seed color.
 
-```{r, echo=FALSE}
-print(merlot2019[0,])
-print(merlot2020[0,])
-```
+# Handling missing data
 
-# Missing data in merlot2019 and merlot2020
+As mentioned above, missing data was unique to the Merlot datasets.
 
 ## Veraison
 
@@ -80,10 +90,12 @@ We know from the client that the veraison column indicates the number days into 
 
 While imputation seems like a reasonable approach, since we know these values must be negative, we can take the maximum between each imputed value and zero to produce complete data sets?
 
-Percentage of missing for the veraison measure of merlot2019 and merlot2020 are shown below.
+Percentage of missing for the veraison measure of merlot2019 and merlot2020 are shown in Table \ref{missing.percent}.
 
-```{r, echo=FALSE}
-c(mean(is.na(merlot2019$veraison)), mean(is.na(merlot2020$veraison)))
+```{r missing.percent, echo=FALSE}
+kable(data.frame("Missing 2019"=paste0(round(mean(is.na(merlot2019$veraison)), 3)*100, "%"), 
+                 "Missing 2020"=paste0(round(mean(is.na(merlot2020$veraison)), 3)*100), "%"),
+      caption="\\label{missing.percent} Percentage of Veraison data that is missing in the 2019 and 2020 Merlot datasets.")
 ```
 
 ## Bloom
@@ -92,11 +104,7 @@ Similar to veraison, the bloom column includes values that indicate the number o
 
 Again, we can consider taking the maximum between each imputed value and zero to produce complete data sets.
 
-Percentage of missing for the bloom measure of merlot2020 is shown below.
-
-```{r, echo=FALSE}
-mean(is.na(merlot2020$bloom))
-```
+`r paste0(round(mean(is.na(merlot2020$bloom)), 3)*100, "%")` of the bloom data in the Merlot 2020 dataset is missing.
 
 ## Yield related measures
 
@@ -363,7 +371,7 @@ From the correlation matrix plots, there seem to be no obvious correlations amon
 ### Chardonnay 2019 
 1. table of mean and variance under control and treatment for each response variable
 ```{r}
-chardonnay2019 %>% 
+char19.tab <- chardonnay2019 %>% 
   group_by(block, treatment) %>% 
   summarise(var.num_of_cluster=var(X..of.clusters),
             mean.num_of_cluster=mean(X..of.clusters),
@@ -371,6 +379,7 @@ chardonnay2019 %>%
             mean.yield=mean(yield..kg.),
             var.cluster_weight=var(av.cluster.weight..kg.),
             mean.cluster_weight=mean(av.cluster.weight..kg.))
+kable(char19.tab, caption="\\label{char19.summary.table} Summary statistics for outcome variables in the Chardonnay 2019 dataset.")
 ```
 
 2. Visualization (side by side boxplots for each response variable)
@@ -645,9 +654,427 @@ for (i in unique(merlot2020.pca$block)){
 
 We see that the normality assumptions are slightly violated, and the equal variance assumptions are also violated even though we only compared variances between treatments within each block. Therefore we will use both a parametric and a non parametric test in the following analysis. (Should repeat the above for all other variables.)
 
-# Aligned rank transform ANOVA (nonparametric test for two-way layout) and ANOVA test
+# Univariate analysis
+## Univariate boxplots
 
-## Chardonnay 2019 number of clusters
+```{r char.univ, fig.cap="\\label{year.char.boxplot} Boxplots of the overall distributions of factors looked at for Chardonnay, divided by year. These plots give us an idea of if there are any glaring outliers."}
+
+# Let's check distributions of variables
+resp.char <- c("X..of.clusters", "yield..kg.", "av.cluster.weight..kg.")
+labels.char <- c("Number of clusters", "Yield (kg)", "Average cluster weight (kg)")
+par(mfrow=c(2,2), mar=c(1,2,2,1))
+for (i in 1:length(resp.char)) {
+  boxplot(chardonnay2019[,which(names(chardonnay2019)==resp.char[i])], 
+          chardonnay2020[,which(names(chardonnay2020)==resp.char[i])], cex.main=1, main=labels.char[i],
+          xlab="Year")
+}
+
+```
+
+```{r mer2019.univ}
+
+# Define the features we want to consider for merlot
+resp.mer <- unique(c(colnames(merlot2019)[-c(1:5, 7)], colnames(merlot2020)[-c(1:5, 7:8)]))
+
+# Strictly univariate: check for outliers
+par(mfrow=c(4,4), mar=c(1,2,2,1))
+for (i in 1:length(resp.mer)) {
+  if (resp.mer[i] %in% c("pruning.weight", "Ravaz.index")) {
+  boxplot(merlot2019[,which(names(merlot2019)==resp.mer[i])], cex.main=0.9, main=resp.mer[i])
+  } else if (resp.mer[i] %in% c("fruitfulness", "brown.seed.color")) {
+  boxplot(merlot2020[,which(names(merlot2020)==resp.mer[i])], cex.main=0.9, main=resp.mer[i])
+  } else {
+  boxplot(merlot2019[,which(names(merlot2019)==resp.mer[i])], 
+          merlot2020[,which(names(merlot2020)==resp.mer[i])], cex.main=0.9, main=resp.mer[i],
+          xlab="Year")
+  }
+}
+
+```
+
+
+# Checking assumptions for statistical tests
+
+We will be running ANOVAs on all outcome variables except Bloom and Veraison to determine whether the treatment influenced the outcome variables. ANOVA tests have two main assumptions:
+
+1. Homoscedasticity: each combination of the treatment and blocking factors have equal variances.
+2. Normality: the outcome variable is approximately normal for each combination of the treatment and blocking factors.
+3. Independence: the samples tested are obtained independently.
+4. Equal sample size: each combination of the treatment and blocking factors have equal sample sizes.
+
+## Homoscedasticity
+
+```{r homoscedas.merlot}
+
+library(lawstat)
+# Create lists of the variables we want to check for homoscedasticity and normality
+resp.mer19 <- colnames(merlot2019)[-c(1:5, 7)]
+resp.mer20 <- colnames(merlot2020)[-c(1:5, 7,9)]
+
+# Create some tables to save the results of our statistical tests in
+homosc.table.mer19 <- array(data=NA, dim=c(length(resp.mer19), 2, 5))
+dimnames(homosc.table.mer19)[[2]] <- c("Bartlett", "Levene")
+dimnames(homosc.table.mer19)[[1]] <- resp.mer19
+
+homosc.table.mer20 <- array(data=NA, dim=c(length(resp.mer20), 2, 5))
+dimnames(homosc.table.mer20)[[2]] <- c("Bartlett", "Levene")
+dimnames(homosc.table.mer20)[[1]] <- resp.mer20
+
+# Compare variances for each unique treatment-block group
+for (i in 1:length(resp.mer19)) {
+  
+  # the lapply function simply extracts the p-value from each outputted run of the MICE data
+  bart.p <- unlist(lapply(with(merlot2019mice, 
+                               bartlett.test(eval(parse(text=resp.mer19[i])) ~ paste(treatment, block)))$analyses, 
+                          FUN=function(x){x$p.value}))
+  lev.p  <- unlist(lapply(with(merlot2019mice, 
+                        levene.test(eval(parse(text=resp.mer19[i])), paste(treatment, block)))$analyses,
+                          FUN=function(x){x$p.value}))
+  homosc.table.mer19[i,1,] <- bart.p
+  homosc.table.mer19[i,2,] <- lev.p
+}
+
+
+# Check out how many of the tests came back with a significant result
+uneq.var.mer19 <- apply(homosc.table.mer20, c(1,2), function(x){sum(x<0.05)})
+
+# Boxplots of the first imputation dataset for the variables with potentially
+# unequal variances
+par(mfrow=c(sum(rowSums(uneq.var.mer19)>0),1))
+lapply(rownames(uneq.var.mer19)[rowSums(uneq.var.mer19)>0], function(x){
+  with(merlot2019mice, 
+       boxplot(cluster.weight ~ paste0(block, treatment))
+       )[[1]]})
+
+
+```
+
+```{r fig.cap="Distributions of values for"}
+
+for (i in 1:length(resp.mer20)) {
+  bart.p <- unlist(lapply(with(merlot2020mice, 
+                               bartlett.test(eval(parse(text=resp.mer20[i])) ~ paste(treatment, block)))$analyses, 
+                          FUN=function(x){x$p.value}))
+  lev.p  <- unlist(lapply(with(merlot2020mice, 
+                        levene.test(eval(parse(text=resp.mer20[i])), paste(treatment, block)))$analyses,
+                          FUN=function(x){x$p.value}))  
+  homosc.table.mer20[i,1,] <- bart.p
+  homosc.table.mer20[i,2,] <- lev.p
+}
+
+# Check out how many of the tests came back with a significant result
+uneq.var.mer20 <- apply(homosc.table.mer19, c(1,2), function(x){sum(x<0.05)})
+
+# Boxplots of the first imputation dataset for the variables with potentially
+# unequal variances
+par(mfrow=c(sum(rowSums(uneq.var.mer20)>0),1), mar=c(3,3,3,3))
+for (var in rownames(uneq.var.mer20)[rowSums(uneq.var.mer20)>0]) {
+  
+  # merlot2020[as.numeric(rownames(merlot2020mice$imp[var][[1]])),
+  #            which(colnames(merlot2020) %in% c("block", "treatment"))]
+  
+  # Plot the non-imputed data
+  plot(split(merlot2020[,which(colnames(merlot2020==var))],
+             paste0(merlot2020$block, merlot2020$treatment)))
+
+}
+
+```
+
+
+```{r homoscedas.chardonnay}
+
+library(lawstat)
+resp.char19 <- colnames(chardonnay2019)[-c(1:5)]
+resp.char20 <- colnames(chardonnay2020)[-c(1:5)]
+
+homosc.table.char19 <- array(data=NA, dim=c(length(resp.char19), 2))
+dimnames(homosc.table.char19)[[2]] <- c("Bartlett", "Levene")
+dimnames(homosc.table.char19)[[1]] <- resp.char19
+
+homosc.table.char20 <- array(data=NA, dim=c(length(resp.char20), 2))
+dimnames(homosc.table.char20)[[2]] <- c("Bartlett", "Levene")
+dimnames(homosc.table.char20)[[1]] <- resp.char20
+
+# Compare variance between treatment and block
+for (i in 1:length(resp.char19)) {
+  
+  # the lapply function simply extracts the p-value from each outputted run of the MICE data
+  bart.p <- with(chardonnay2019, 
+                               bartlett.test(eval(parse(text=resp.char19[i])) ~ paste(treatment, block)))$p.value
+  lev.p  <- with(chardonnay2019, 
+                        levene.test(eval(parse(text=resp.char19[i])), paste(treatment, block)))$p.value
+  homosc.table.char19[i,1] <- bart.p
+  homosc.table.char19[i,2] <- lev.p
+}
+for (i in 1:length(resp.char20)) {
+  bart.p <- with(chardonnay2020, 
+                               bartlett.test(eval(parse(text=resp.char20[i])) ~ paste(treatment, block)))$p.value
+  lev.p  <- with(chardonnay2020, 
+                        levene.test(eval(parse(text=resp.char20[i])), paste(treatment, block)))$p.value
+  homosc.table.char20[i,1] <- bart.p
+  homosc.table.char20[i,2] <- lev.p
+}
+
+par(mar=c(4,4,3,3))
+boxplot(chardonnay2019$X..of.clusters ~ chardonnay2019$treatment + chardonnay2019$block,
+        xlab="Treatment + Block", ylab="Number of clusters")
+
+```
+
+## Normality
+
+We used Shapiro-Wilkes tests to check the normality assumption of the ANOVA tests, checking each block-treatment combination for each of the tested variables. For any Shapiro-Wilkes tests that resulted in a potentially significant breach from normality, the Q-Q plots were plotted (Figures \ref{qq.mer19}, \ref{qq.mer20}, \ref{qq.char19}, \ref{qq.char20}).
+
+Upon observations of the Q-Q plots, it looks like deviations are largely due to outliers. This may pose a problem in the accuracy of the ANOVA tests as ANOVA can be sensitive to outliers. 
+
+```{r qq.mer19 fig.cap="\\label{qq.mer19} Q-Q plots for treatment-block groups in the Merlot 2019 data that indicated a potentially significant breach from normality. The number in the title for each plot indicates the block, followed by the treatment and the variable in question."}
+
+# Run shapiro-wilkes tests on each of the variables we will run ANOVAs on
+norm.tests.mer19 <- array(NA, c(12, length(resp.mer19)))
+colnames(norm.tests.mer19) <- resp.mer19
+rownames(norm.tests.mer19) <- unique(paste(merlot2019$block, merlot2019$treatment))[order(unique(paste(merlot2019$block, merlot2019$treatment)))]
+
+# Run the shapiro wilkes test on each of the outcome variables in the Merlot 2019 dataset
+for (i in 1:length(resp.mer19)) {
+  shapiro.results <- with(merlot2019, {lapply(split(eval(parse(text=resp.mer19[i])), 
+                                                        paste0(block, treatment)), 
+                                                  shapiro.test)})
+  # Save the shapiro wilkes tests for each of the populations (unique combination of block & treatment)
+  # in one large array
+  for (k in 1:12) {norm.tests.mer19[k,i] <- shapiro.results[[k]]$p.value}
+}
+
+# Find the row and column names of the potentially non-normal data
+non.norm <- which(norm.tests.mer19<0.05, arr.ind=T)
+non.norm[,2] <- colnames(norm.tests.mer19)[non.norm[,2]]
+non.norm[,1] <- rownames(norm.tests.mer19)[as.numeric(non.norm[,1])]
+# Plot the Q-Q plots of the potentially non-normal groups
+par(mfrow=c(3,3), mar=c(3,3,3,3))
+for (i in 1:dim(non.norm)[1]) {
+  qqnorm(merlot2019[which(paste(merlot2019$block, merlot2019$treatment)==non.norm[i,1]),non.norm[i,2]],
+         main=paste("Q-Q plot:", non.norm[i,1], non.norm[i,2]))
+  qqline(merlot2019[which(paste(merlot2019$block, merlot2019$treatment)==non.norm[i,1]),non.norm[i,2]])
+}
+
+```
+
+```{r qq.mer20 fig.cap="\\label{qq.mer20} Q-Q plots for treatment-block groups in the Merlot 2020 data that indicated a potentially significant breach from normality. The number in the title for each plot indicates the block, followed by the treatment and the variable in question. Imputed data points are plotted in red."}
+
+# Run shapiro-wilkes tests on each of the variables
+norm.tests.mer20 <- array(NA, c(12, length(resp.mer20), 5))
+dimnames(norm.tests.mer20)[[2]] <- resp.mer20
+dimnames(norm.tests.mer20)[[1]] <- unique(paste(merlot2020$block, merlot2020$treatment))
+
+# Run the shapiro wilkes test on each of the outcome variables in the Merlot 2019 dataset
+for (i in 1:length(resp.mer20)) {
+  shapiro.results <- with(merlot2020mice, {lapply(split(eval(parse(text=resp.mer20[i])), 
+                                                        paste0(block, treatment)), 
+                                                  shapiro.test)})
+  # Save the shapiro wilkes tests for each of the populations (unique combination of block & treatment)
+  # in one large array
+  for (j in 1:5) {for (k in 1:12) {norm.tests.mer20[k,i,j] <- shapiro.results$analyses[[j]][[k]]$p.value}}}
+
+# Get a table of when a p-value for the Shapiro-Wilkes tests
+# was <0.05, indicating a potential divergence from normality
+nonnorm.mer20 <- apply(norm.tests.mer20, c(1,2), function(x){sum(x<0.05)})
+nonnorm.mer20.rowcol <- which(nonnorm.mer20>0, arr.ind=T)
+nonnorm.mer20.rowcol[,2] <- colnames(nonnorm.mer20)[nonnorm.mer20.rowcol[,2]]
+nonnorm.mer20.rowcol[,1] <- rownames(nonnorm.mer20)[as.numeric(nonnorm.mer20.rowcol[,1])]
+# Plot the Q-Q plots of the potentially non-normal groups
+par(mfrow=c(4,5), mar=c(3,3,3,3))
+for (i in 1:dim(nonnorm.mer20.rowcol)[1]) {
+  dat <- with(merlot2020mice, {
+       dat <- eval(parse(text=nonnorm.mer20.rowcol[i,2]))
+       dat[which(paste(block, treatment)==nonnorm.mer20.rowcol[i,1])]})$analyses
+  
+  # Get the Q-Q plot quantiles -- the x-axis of our Q-Q plot
+  quantiles <- rep(c(-1.1797611, -0.4972006,  0, 0.4972006,  1.1797611), 5)
+  
+  # The y-values of our imputed datasets, ordered appropriately
+  yvals <- unlist(lapply(dat, function(x){x[order(x)]}))
+  
+  # Define the color for the points: the 
+  col <- is.na(merlot2020[which(paste(merlot2020$block, 
+                                      merlot2020$treatment)==nonnorm.mer20.rowcol[i,1]), 
+                          nonnorm.mer20.rowcol[i,2]])[order(dat[[1]])]
+  
+  # Plot our Q-Q plot
+  plot(quantiles, yvals, col=rep(col+1, 5), 
+       main=paste0(nonnorm.mer20.rowcol[i,1], "\n", nonnorm.mer20.rowcol[i,2]),
+       pch=16)
+}
+
+
+```
+
+
+```{r qq.char19 fig.cap="\\label{qq.char19} Q-Q plots for treatment-block groups in the Chardonnay 2019 data that indicated a potentially significant breach from normality. The number in the title for each plot indicates the block, followed by the treatment and the variable in question."}
+
+# Run shapiro-wilkes tests on each of the variables we will run ANOVAs on
+norm.tests.char19 <- array(NA, c(10, length(resp.char19)))
+colnames(norm.tests.char19) <- resp.char19
+rownames(norm.tests.char19) <- unique(paste(chardonnay2019$block, chardonnay2019$treatment))[order(unique(paste(chardonnay2019$block, chardonnay2019$treatment)))]
+
+# Run the shapiro wilkes test on each of the outcome variables in the chardonnay 2019 dataset
+for (i in 1:length(resp.char19)) {
+  shapiro.results <- with(chardonnay2019, {lapply(split(eval(parse(text=resp.char19[i])), 
+                                                        paste0(block, treatment)), 
+                                                  shapiro.test)})
+  # Save the shapiro wilkes tests for each of the populations (unique combination of block & treatment)
+  # in one large array
+  for (k in 1:10) {norm.tests.char19[k,i] <- shapiro.results[[k]]$p.value}
+}
+
+# Find the row and column names of the potentially non-normal data
+non.norm <- which(norm.tests.char19<0.05, arr.ind=T)
+non.norm[,2] <- colnames(norm.tests.char19)[non.norm[,2]]
+non.norm[,1] <- rownames(norm.tests.char19)[as.numeric(non.norm[,1])]
+# Plot the Q-Q plots of the potentially non-normal groups
+par(mfrow=c(2,2), mar=c(3,3,3,3))
+for (i in 1:dim(non.norm)[1]) {
+  qqnorm(chardonnay2019[which(paste(chardonnay2019$block, chardonnay2019$treatment)==non.norm[i,1]),non.norm[i,2]],
+         main=paste("Q-Q plot:", non.norm[i,1], non.norm[i,2]))
+  qqline(chardonnay2019[which(paste(chardonnay2019$block, chardonnay2019$treatment)==non.norm[i,1]),non.norm[i,2]])
+}
+
+```
+
+```{r qq.char20 fig.cap="\\label{qq.char19} Q-Q plots for treatment-block groups in the Chardonnay 2019 data that indicated a potentially significant breach from normality. The number in the title for each plot indicates the block, followed by the treatment and the variable in question."}
+
+# Run shapiro-wilkes tests on each of the variables we will run ANOVAs on
+norm.tests.char20 <- array(NA, c(10, length(resp.char20)))
+colnames(norm.tests.char20) <- resp.char20
+rownames(norm.tests.char20) <- unique(paste(chardonnay2020$block, chardonnay2020$treatment))[order(unique(paste(chardonnay2020$block, chardonnay2020$treatment)))]
+
+# Run the shapiro wilkes test on each of the outcome variables in the chardonnay 2020 dataset
+for (i in 1:length(resp.char20)) {
+  shapiro.results <- with(chardonnay2020, {lapply(split(eval(parse(text=resp.char20[i])), 
+                                                        paste0(block, treatment)), 
+                                                  shapiro.test)})
+  # Save the shapiro wilkes tests for each of the populations (unique combination of block & treatment)
+  # in one large array
+  for (k in 1:10) {norm.tests.char20[k,i] <- shapiro.results[[k]]$p.value}
+}
+
+# Find the row and column names of the potentially non-normal data
+non.norm <- which(norm.tests.char20<0.05, arr.ind=T)
+non.norm[,2] <- colnames(norm.tests.char20)[non.norm[,2]]
+non.norm[,1] <- rownames(norm.tests.char20)[as.numeric(non.norm[,1])]
+# Plot the Q-Q plots of the potentially non-normal groups
+par(mfrow=c(2,1), mar=c(3,3,3,3))
+for (i in 1:dim(non.norm)[1]) {
+  qqnorm(chardonnay2020[which(paste(chardonnay2020$block, chardonnay2020$treatment)==non.norm[i,1]),non.norm[i,2]],
+         main=paste("Q-Q plot:", non.norm[i,1], non.norm[i,2]))
+  qqline(chardonnay2020[which(paste(chardonnay2020$block, chardonnay2020$treatment)==non.norm[i,1]),non.norm[i,2]])
+}
+
+```
+
+
+# Statistical analyses
+
+## Cox PH models for censored data
+
+As previously discussed, Bloom and Veraison were both censored data for the Merlot datasets. For some of the plants, 100% bloom or veraison had already occurred, so the event (50% bloom or veraison) was left-censored. For other plants, the berries or flowers had not yet grown, indicating right-censoring (the event had not yet been observed). 
+
+Both bloom and veraison were measured three times (at times T1, T2, and T3, let's say), and the approximate event date (50% veraison or 50% bloom) was determined using a linear regression. There are two types of missing data: 
+
+(1) The event did not occur because no berries or flowers grew. This is known as right-censored data. In this case, the event happened in the interval (T3,Inf)
+(2) The event already occurred prior to the first observation. This is known as left-censored data. In this case, the event happened sometime in the interval (-Inf, T1].
+
+We have been in contact with the client to try to determine the exact T1 and T3 for each of the dates. However, in the absence of this data, we can use Multiple Imputation as our T1 and T3 dates. Additionally, for veraison, until we hear from the client, we can impute the lower bound of the interval for left-censored data as the 50% bloom date.
+
+After treating the data as interval data, we can then construct Cox proportional hazards models to fit the data. We used tools in an R package called icenReg, which uses bootstrapping for inference on the regression parameters to perform hypothesis testing.
+
+```{r surv.2020}
+
+# First define our dataset of start and end times for our event intervals
+icen.mer20 <- with(merlot2020mice, {
+  
+  # If the data isn't censored (non-NA bloom), let the start and end be equal to each other
+  icen.mer20 <- data.frame("bloom.start"=bloom, "bloom.end"=bloom,
+                           "verais.start"=veraison, "verais.end"=veraison)
+
+  # If the data is right-censored (cluster.number==0; event happened after
+  # the study period of interest), then let the "start" be the imputed value
+  # and set the ending value to Inf
+  icen.mer20$bloom.end[is.na(merlot2020$bloom) & cluster.number==0] <- Inf
+  icen.mer20$verais.end[is.na(merlot2020$veraison) & cluster.number==0] <- Inf
+  
+  # If the data is left-censored (event happened before we started recording Veraison)
+  # (cluster.number>0), then let the "end" be the imputed value and
+  # set the starting value to -Inf
+  # For veraison, we can set the starting value to the max of -Inf and the 50% bloom date
+  left.bloom <- is.na(merlot2020$bloom) & cluster.number>0
+  icen.mer20$bloom.start[left.bloom] <- -Inf
+  left.ver <- is.na(merlot2020$veraison) & cluster.number>0
+  icen.mer20$verais.start[left.ver] <- max(merlot2020$bloom[left.ver]-61,
+                                           -Inf, na.rm=T)
+  return(icen.mer20)
+  })$analyses
+
+
+library(icenReg)
+# Build a model for the bloom data
+coxph.bloom20 <- lapply(icen.mer20, function(x){
+  bloom20 <- data.frame("s"=x$bloom.start, "e"=x$bloom.end)
+  # Fit a cox-PH model
+  cox.fit <- ic_sp(cbind(s,e) ~ merlot2020$treatment + merlot2020$block, 
+               data=bloom20, model='ph', bs_samples=100)
+  return(cox.fit)
+  })
+
+# Build a model for the veraison data
+coxph.ver20 <- lapply(icen.mer20, function(x){
+  ver20 <- data.frame("s"=x$verais.start, "e"=x$verais.end)
+  # Fit a cox-PH model
+  cox.fit <- ic_sp(cbind(s,e) ~ merlot2020$treatment + merlot2020$block, 
+               data=ver20, model='ph', bs_samples=100)
+  return(cox.fit)
+  })
+
+```
+
+```{r surv.2019}
+
+# First define our dataset of start and end times for our event intervals
+icen.mer19 <- with(merlot2019mice, {
+  
+  # If the data isn't censored (non-NA bloom), let the start and end be equal to each other
+  icen.mer19 <- data.frame("verais.start"=veraison, "verais.end"=veraison)
+
+  # If the data is right-censored (cluster.number==0; event happened after
+  # the study period of interest), then let the "start" be the imputed value
+  # and set the ending value to Inf
+  icen.mer19$verais.end[is.na(merlot2019$veraison) & cluster.number==0] <- Inf
+  
+  # If the data is left-censored (event happened before we started recording Veraison)
+  # (cluster.number>0), then let the "end" be the imputed value and
+  # set the starting value to -Inf
+  left.ver <- is.na(merlot2019$veraison) & cluster.number>0
+  icen.mer19$verais.start[left.ver] <- -Inf
+  
+  return(icen.mer19)
+  })$analyses
+
+# Build a model for the veraison data
+coxph.ver19 <- lapply(icen.mer19, function(x){
+  ver19 <- data.frame("s"=x$verais.start, "e"=x$verais.end)
+  # Fit a cox-PH model
+  cox.fit <- ic_sp(cbind(s,e) ~ merlot2019$treatment + merlot2019$block, 
+               data=ver19, model='ph', bs_samples=100)
+  return(cox.fit)
+  })
+
+
+```
+
+Results indicate that neither the treatment nor the block effects influenced Veraison in either 2019 or 2020. Bloom was influenced by block effect but not by the treatment.
+
+## Aligned rank transform ANOVA (nonparametric test for two-way layout) and ANOVA test
+
+### Chardonnay 2019 number of clusters
 ```{r, echo=FALSE}
 ### Aligned rank transform ANOVA
 library(ARTool)
@@ -660,7 +1087,7 @@ print(res)
 summary(aov(X..of.clusters ~ treatment + block + treatment:block, data = dat))
 ```
 
-## Chardonnay 2019 yield
+### Chardonnay 2019 yield
 ```{r, echo=FALSE}
 ### Aligned rank transform ANOVA
 library(ARTool)
@@ -673,7 +1100,7 @@ print(res)
 summary(aov(yield..kg. ~ treatment + block + treatment:block, data = dat))
 ```
 
-## Chardonnay 2019 average cluster weight
+### Chardonnay 2019 average cluster weight
 ```{r, echo=FALSE}
 library(ARTool)
 dat = chardonnay2019
@@ -685,7 +1112,7 @@ print(res)
 summary(aov(av.cluster.weight..kg. ~ treatment + block + treatment:block, data = dat))
 ```
 
-## Chardonnay 2020 number of clusters
+### Chardonnay 2020 number of clusters
 ```{r, echo=FALSE}
 library(ARTool)
 dat = chardonnay2020
@@ -699,7 +1126,7 @@ summary(aov(X..of.clusters ~ treatment + block + treatment:block, data = dat))
 
 block factor was found significant to the number of clusters in both tests.
 
-## Chardonnay 2020 yield
+### Chardonnay 2020 yield
 ```{r, echo=FALSE}
 library(ARTool)
 dat = chardonnay2020
@@ -713,7 +1140,7 @@ summary(aov(yield..kg. ~ treatment + block + treatment:block, data = dat))
 
 Block factor was found significant to yield in both tests.
 
-## Chardonnay 2020 average cluster weight
+### Chardonnay 2020 average cluster weight
 ```{r, echo=FALSE}
 library(ARTool)
 dat = chardonnay2020
@@ -725,7 +1152,7 @@ print(res)
 summary(aov(av.cluster.weight..kg. ~ treatment + block + treatment:block, data = dat))
 ```
 
-## Merlot 2019 growth PC
+### Merlot 2019 growth PC
 ```{r, echo=FALSE}
 library(ARTool)
 dat = merlot2019.pca
@@ -739,7 +1166,7 @@ summary(aov(merlot2019.growth.pc ~ treatment + block + treatment:block, data = d
 
 Again, block was found significant to the growth of grape (specifically what?) in both test. Treatment was also found significant in ANOVA, but ANOVA assumption does not hold, the result may not be reliable.
 
-## Merlot 2019 yield PC
+### Merlot 2019 yield PC
 ```{r, echo=FALSE}
 library(ARTool)
 dat = merlot2019.pca
@@ -753,7 +1180,7 @@ summary(aov(merlot2019.yield.pc ~ treatment + block + treatment:block, data = da
 
 Block was again found significantly influential to yield
 
-## Merlot 2019 quality PC
+### Merlot 2019 quality PC
 ```{r, echo=FALSE}
 library(ARTool)
 dat = merlot2019.pca
@@ -765,7 +1192,7 @@ print(res)
 summary(aov(merlot2019.quality.pc ~ treatment + block + treatment:block, data = dat))
 ```
 
-## Merlot 2019 pruning PC
+### Merlot 2019 pruning PC
 ```{r, echo=FALSE}
 library(ARTool)
 dat = merlot2019.pca
@@ -779,7 +1206,7 @@ summary(aov(merlot2019.pruning.pc ~ treatment + block + treatment:block, data = 
 
 Interaction was found significant in pruning (pruning weight, Ravaz index)
 
-## Merlot 2020 growth PC
+### Merlot 2020 growth PC
 ```{r, echo=FALSE}
 library(ARTool)
 dat = merlot2020.pca
@@ -793,7 +1220,7 @@ summary(aov(merlot2020.growth.pc ~ treatment + block + treatment:block, data = d
 
 treatment and interaction were found significantly related to the growth. Maybe a particular geographical area combined with the heating technique effect are beneficial for the growth of grapes. We may also conduct **multiple comparison**.
 
-## Merlot 2020 yield PC
+### Merlot 2020 yield PC
 ```{r, echo=FALSE}
 library(ARTool)
 dat = merlot2020.pca
@@ -805,7 +1232,7 @@ print(res)
 summary(aov(merlot2020.yield.pc ~ treatment + block + treatment:block, data = dat))
 ```
 
-## Merlot 2020 quality PC
+### Merlot 2020 quality PC
 ```{r, echo=FALSE}
 library(ARTool)
 dat = merlot2020.pca
