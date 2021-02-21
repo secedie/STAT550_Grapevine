@@ -736,7 +736,7 @@ for (i in 1:length(resp.mer19)) {
 
 
 # Check out how many of the tests came back with a significant result
-uneq.var.mer19 <- apply(homosc.table.mer20, c(1,2), function(x){sum(x<0.05)})
+uneq.var.mer19 <- apply(homosc.table.mer19, c(1,2), function(x){sum(x<0.05)})
 
 # Boxplots of the first imputation dataset for the variables with potentially
 # unequal variances
@@ -774,7 +774,7 @@ for (var in rownames(uneq.var.mer20)[rowSums(uneq.var.mer20)>0]) {
   #            which(colnames(merlot2020) %in% c("block", "treatment"))]
   
   # Plot the non-imputed data
-  plot(split(merlot2020[,which(colnames(merlot2020==var))],
+  plot(split(merlot2020[,which(colnames(merlot2020)==var)],
              paste0(merlot2020$block, merlot2020$treatment)))
 
 }
