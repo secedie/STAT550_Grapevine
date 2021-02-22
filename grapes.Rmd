@@ -14,10 +14,6 @@ knitr::opts_chunk$set(echo = FALSE)
 library(tidyverse)
 library(corrplot)
 library(icenReg) # for survival analysis
-<<<<<<< HEAD
-=======
-library(survival)
->>>>>>> 6eee896845bf5073aaae922768eed94b3086792b
 library(knitr)
 library(lawstat) # for the levene test
 ```
@@ -698,10 +694,6 @@ for (i in 1:length(resp.mer)) {
 
 
 # Checking assumptions for statistical tests
-<<<<<<< HEAD
-=======
-# Assumptions
->>>>>>> 6eee896845bf5073aaae922768eed94b3086792b
 
 We will be running ANOVAs on all outcome variables except Bloom and Veraison to determine whether the treatment influenced the outcome variables. ANOVA tests have two main assumptions:
 
@@ -754,12 +746,18 @@ lapply(rownames(uneq.var.mer19)[rowSums(uneq.var.mer19)>0], function(x){
 
 ```
 
-```{r fig.cap="Distributions of values for"}
+```{r fig.cap="Distributions of variables for which equal variance assumptions were violated for at least one of the subgroups being analyzed."}
 
 for (i in 1:length(resp.mer20)) {
+  
+  # Run bartlett test on every variable for every
+  # imputed datset
   bart.p <- unlist(lapply(with(merlot2020mice, 
                                bartlett.test(eval(parse(text=resp.mer20[i])) ~ paste(treatment, block)))$analyses, 
                           FUN=function(x){x$p.value}))
+  
+  # Run levene test on every variable for every imputed
+  # dataset
   lev.p  <- unlist(lapply(with(merlot2020mice, 
                         levene.test(eval(parse(text=resp.mer20[i])), paste(treatment, block)))$analyses,
                           FUN=function(x){x$p.value}))  
@@ -768,7 +766,7 @@ for (i in 1:length(resp.mer20)) {
 }
 
 # Check out how many of the tests came back with a significant result
-uneq.var.mer20 <- apply(homosc.table.mer19, c(1,2), function(x){sum(x<0.05)})
+uneq.var.mer20 <- apply(homosc.table.mer20, c(1,2), function(x){sum(x<0.05)})
 
 # Boxplots of the first imputation dataset for the variables with potentially
 # unequal variances
@@ -779,46 +777,18 @@ for (var in rownames(uneq.var.mer20)[rowSums(uneq.var.mer20)>0]) {
   #            which(colnames(merlot2020) %in% c("block", "treatment"))]
   
   # Plot the non-imputed data
-  plot(split(merlot2020[,which(colnames(merlot2020)==var)],
-             paste0(merlot2020$block, merlot2020$treatment)))
-<<<<<<< HEAD
+  boxplot(split(merlot2020[,which(colnames(merlot2020)==var)],
+             paste0(merlot2020$block, merlot2020$treatment)),
+          main=var)
 
-=======
->>>>>>> 6eee896845bf5073aaae922768eed94b3086792b
 }
 resp.mer19 <- colnames(merlot2019)[-c(1:5, 7)]
 resp.mer20 <- colnames(merlot2020)[-c(1:5, 7:8)]
 
-<<<<<<< HEAD
-=======
 homosc.table.mer19 <- data.frame("Variable"=rep(NA, length(resp.mer)),
                                  "Bartlett p-value"=rep(NA, length(resp.mer)),
                                  "Levene p-value"=rep(NA, length(resp.mer)))
 
-# Compare variance between treatment
-par(mfrow=c(4,4), mar=c(1,2,2,1))
-for (i in 1:length(resp.mer)) {
-  var <- merlot2019[,which(names(merlot2019)==resp.mer[i])]
-  boxplot(var[!is.na(var)] ~ merlot2019$treatment[!is.na(var)], 
-          cex.main=0.9, main=resp.mer[i])
-  p <- bartlett.test(var[!is.na(var)] ~ merlot2019$treatment[!is.na(var)])$p.value
-  p.2 <- levene.test(var[!is.na(var)], 
-                     as.factor(merlot2019$treatment[!is.na(var)]))$p.value
-  print(paste(resp.mer[i], round(p, 3), round(p.2, 3)))
-}
-# Compare variance between blocks
-par(mfrow=c(4,4), mar=c(1,2,2,1))
-for (i in 1:length(resp.mer)) {
-  var <- mer[,which(names(mer)==resp.mer[i])]
-  boxplot(var[!is.na(var)] ~ mer$block[!is.na(var)], 
-          cex.main=0.9, main=resp.mer[i])
-  p <- bartlett.test(var[!is.na(var)] ~ mer$block[!is.na(var)])$p.value
-  p.2 <- levene.test(var[!is.na(var)], 
-                     as.factor(mer$block[!is.na(var)]))$p.value
-  print(paste(resp.mer[i], round(p, 3), round(p.2, 3)))
-}
-
->>>>>>> 6eee896845bf5073aaae922768eed94b3086792b
 ```
 
 
@@ -861,26 +831,6 @@ boxplot(chardonnay2019$X..of.clusters ~ chardonnay2019$treatment + chardonnay201
         xlab="Treatment + Block", ylab="Number of clusters")
 ```
 
-```{r homoscedas.char}
-
-<<<<<<< HEAD
-=======
-# Compare variance between treatment
-par(mfrow=c(2,2), mar=c(1,2,2,1))
-for (i in 1:length(resp.char)) {
-  boxplot(char[,which(names(char)==resp.char[i])] ~ char$treatment, cex.main=0.9, main=resp.char[i])
-  p <- bartlett.test(char[,which(names(char)==resp.char[i])] ~ char$treatment)$p.value
-  print(paste(resp.char[i], p))
-}
-# Compare variance between blocks
-par(mfrow=c(2,2), mar=c(1,2,2,1))
-for (i in 1:length(resp.char)) {
-  boxplot(char[,which(names(char)==resp.char[i])] ~ char$block, cex.main=0.9, main=resp.char[i])
-  p <- bartlett.test(char[,which(names(char)==resp.char[i])] ~ char$block)$p.value
-  print(paste(resp.char[i], p))
-}
->>>>>>> 6eee896845bf5073aaae922768eed94b3086792b
-```
 
 ## Normality
 
@@ -919,11 +869,7 @@ for (i in 1:dim(non.norm)[1]) {
 
 ```
 
-<<<<<<< HEAD
-```{r qq.mer20 fig.cap="\\label{qq.mer20} Q-Q plots for treatment-block groups in the Merlot 2020 data that indicated a potentially significant breach from normality. The number in the title for each plot indicates the block, followed by the treatment and the variable in question. Imputed data points are plotted in red."}
-=======
 ```{r qq.mer20, fig.cap="\\label{qq.mer20} Q-Q plots for treatment-block groups in the Merlot 2020 data that indicated a potentially significant breach from normality. The number in the title for each plot indicates the block, followed by the treatment and the variable in question. Imputed data points are plotted in red."}
->>>>>>> 6eee896845bf5073aaae922768eed94b3086792b
 
 # Run shapiro-wilkes tests on each of the variables
 norm.tests.mer20 <- array(NA, c(12, length(resp.mer20), 5))
@@ -1034,22 +980,6 @@ for (i in 1:dim(non.norm)[1]) {
 }
 ```
 
-```{r qq.mer}
-
-# Check normality
-par(mfrow=c(4,4), mar=c(1,2,2,1))
-for (i in 1:length(resp.mer)) {
-  qqnorm(mer[mer$treatment=="heat",which(names(mer)==resp.mer[i])], cex.main=0.9, main=resp.mer[i])
-  qqline(mer[mer$treatment=="heat",which(names(mer)==resp.mer[i])], cex.main=0.9, main=resp.mer[i])
-}
-for (i in 1:length(resp.mer)) {
-  qqnorm(mer[mer$treatment=="control",which(names(mer)==resp.mer[i])], cex.main=0.9, main=resp.mer[i])
-  qqline(mer[mer$treatment=="control",which(names(mer)==resp.mer[i])], cex.main=0.9, main=resp.mer[i])
-}
-
-```
-
-
 # Statistical analyses
 
 ## Cox PH models for censored data
@@ -1151,12 +1081,7 @@ coxph.ver19 <- lapply(icen.mer19, function(x){
 Results indicate that neither the treatment nor the block effects influenced Veraison in either 2019 or 2020. Bloom was influenced by block effect but not by the treatment.
 
 ## Aligned rank transform ANOVA (nonparametric test for two-way layout) and ANOVA test
-<<<<<<< HEAD
-=======
-# Statistical analyses
 
-# Aligned rank transform ANOVA (nonparametric test for two-way layout) and ANOVA test
->>>>>>> 6eee896845bf5073aaae922768eed94b3086792b
 
 ### Chardonnay 2019 number of clusters
 ```{r, echo=FALSE}
