@@ -13,7 +13,7 @@ editor_options:
 ```{r setup, include=TRUE, echo=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
 library(tidyverse)
-library(ggpubr)
+library(ggpubr) 
 library(corrplot)
 library(icenReg) # for survival analysis
 library(knitr)
@@ -247,7 +247,7 @@ Check out the imputed data sets in the code blocks!
 
 ```{r, include=FALSE}
 merlot2019 # this is now complete
-complete(merlot2020mice, 1) # first (out of 5) imputed data set for merlot2020 using all responses including the filled-in zeros
+merlot2020<-complete(merlot2020mice, 1) # first (out of 5) imputed data set for merlot2020 using all responses including the filled-in zeros
 # complete(merlot2020miceNoZero, 1) # first (out of 5) imputed data set for merlot2020 without the filled-in zeros
 ```
 
@@ -328,7 +328,7 @@ merlot2020.pca
 chardonnay2019 %>% 
   select(-1:-5) %>% 
   cor() %>% 
-  corrplot(type = "upper", order = "hclust", tl.col = "black", tl.srt = 45, addCoef.col="white", number.cex=0.7)
+  corrplot(type = "upper", order = "hclust", tl.col = "black", tl.srt = 45, addCoef.col="white", number.cex=0.7, )
 ```
 From the output of correlation function, there seem no correlations between response variables.
 
@@ -388,55 +388,25 @@ char19.tab <- chardonnay2019 %>%
 kable(char19.tab, caption="\\label{char19.summary.table} Summary statistics for outcome variables in the Chardonnay 2019 dataset.")
 ```
 
+2. Visualization (side by side boxplots for each response variable)
 ```{r}
 plot_resp = function(data, resp){
   ggplot(data, aes(x=treatment, y = .data[[resp]], fill=treatment))+
-  scale_fill_manual(values=c("lightblue2", "seashell2"))+
-  labs(title = resp) +
-  ylab(" ") +
-  geom_boxplot()
+    scale_fill_manual(values=c("lightblue2", "seashell2"))+
+    ylab(resp) +
+    xlab(" ") +
+    theme(legend.position = "none")+
+    geom_boxplot()
 }
 
 plot_list1= lapply(colnames(char2019.resp), plot_resp, data = chardonnay2019)
 ggarrange(plotlist = plot_list1)
 
-plot_list2=lapply(colnames(char2020.resp),plot_resp, data=chardonnay2020)
-ggarrange(plotlist = plot_list2)
 
-plot_list3=lapply(colnames(merlot2019[-c(1:5)]), plot_resp, data=merlot2019)
-ggarrange(plotlist = plot_list3)
 
-plot_list4=lapply(colnames(merlot2020[-c(1:5)]), plot_resp, data=merlot2020)
-ggarrange(plotlist = plot_list4)
+
 ```
 
-
-2. Visualization (side by side boxplots for each response variable)
-
-```{r}
-p1<- chardonnay2019 %>% 
-  ggplot(aes(x=treatment, y = X..of.clusters, fill=treatment)) +
-  scale_fill_manual(values=c("lightblue2", "seashell2"))+
-  geom_boxplot()+
-  labs(title = "number of clusters") +
-  ylab("number of clusters")
-
-p2<-chardonnay2019 %>% 
-  ggplot(aes(x=treatment, y = yield..kg., fill=treatment)) +
-  scale_fill_manual(values=c("lightblue2", "seashell2"))+
-  geom_boxplot()+
-  labs(title = "yield") +
-  ylab("yield")
-
-p3<-chardonnay2019 %>% 
-  ggplot(aes(x=treatment, y = av.cluster.weight..kg., fill=treatment)) +
-  scale_fill_manual(values=c("lightblue2", "seashell2"))+
-  geom_boxplot()+
-  labs(title = "average cluster weight") +
-  ylab("average cluster weight")
-
-ggarrange(p1,p2,p3)
-```
 
 3. Visualization (side by side boxplots for each response variable + block)
 
@@ -485,34 +455,11 @@ kable(char20.tab, caption="\\label{char20.summary.table} Summary statistics for 
 
 2. Visualization (side by side boxplots for each response variable) 
 ```{r}
-p1<-chardonnay2020 %>% 
-  ggplot(aes(x=treatment, y = X..of.clusters, fill=treatment))+
-  scale_fill_manual(values=c("lightblue2", "seashell2"))+
-  geom_boxplot()+
-  labs(title = "number of clusters") +
-  ylab("number of clusters")
-
-## check assumptions of yield
-p2<-chardonnay2020 %>% 
-  ggplot(aes(x=treatment, y = yield..kg., fill=treatment)) +
-  scale_fill_manual(values=c("lightblue2", "seashell2"))+
-  geom_boxplot()+
-  labs(title = "yield") +
-  ylab("yield")
-
-## check assumptions for average cluster weight
-p3<-chardonnay2020 %>% 
-  ggplot(aes(x=treatment, y = av.cluster.weight..kg., fill=treatment)) +
-  scale_fill_manual(values=c("lightblue2", "seashell2"))+
-  geom_boxplot()+
-  labs(title = "average cluster weight") +
-  ylab("average cluster weight")
-
-ggarrange(p1,p2,p3)
+plot_list2=lapply(colnames(char2020.resp),plot_resp, data=chardonnay2020)
+ggarrange(plotlist = plot_list2)
 ```
 
 3. Visualization (side by side boxplots for each response variable - block)
-
 ```{r}
 ## check assumptions of number of clusters
 chardonnay2020 %>% 
@@ -562,28 +509,8 @@ kable(mer19.tab, caption="\\label{mer19.summary.table} Summary statistics for ou
 2. Visualization (side by side boxplots for each response variable)
 
 ```{r}
-p1<-ggplot(merlot2019.pca, aes(x=treatment, y = merlot2019.growth.pc, fill=treatment)) +
-  scale_fill_manual(values=c("lightblue2", "seashell2"))+
-  geom_boxplot()+
-  labs(title = "growth") +
-  ylab("growth")
-
-p2<-ggplot(merlot2019.pca, aes(x=treatment, y = merlot2019.yield.pc, fill=treatment)) +
-  scale_fill_manual(values=c("lightblue2", "seashell2"))+
-  geom_boxplot()+
-  labs(title = "yield") 
-
-p3<-ggplot(merlot2019.pca, aes(x=treatment, y = merlot2019.quality.pc, fill=treatment)) +
-  scale_fill_manual(values=c("lightblue2", "seashell2"))+
-  geom_boxplot()+
-  labs(title = "quality") 
-
-p4<-ggplot(merlot2019.pca, aes(x=treatment, y = merlot2019.pruning.pc, fill=treatment)) +
-  scale_fill_manual(values=c("lightblue2", "seashell2"))+
-  geom_boxplot()+
-  labs(title = "pruning") 
-
-ggarrange(p1,p2,p3,p4)
+plot_list3=lapply(colnames(merlot2019[-c(1:5)]), plot_resp, data=merlot2019)
+ggarrange(plotlist = plot_list3)
 ```
 
 3. Visualization (side by side boxplots for each response variable - block)
@@ -633,27 +560,9 @@ kable(mer20.tab, caption="\\label{char19.summary.table} Summary statistics for o
 2. Visualization (side by side boxplots for each response variable)
 
 ```{r}
-p1<-ggplot(merlot2020.pca, aes(x=treatment, y = merlot2020.growth.pc, fill=treatment)) +
-  scale_fill_manual(values=c("lightblue2", "seashell2"))+
-  geom_boxplot()+
-  labs(title = "growth") +
-  ylab("growth") 
 
-p2<-ggplot(merlot2020.pca, aes(x=treatment, y = merlot2020.yield.pc, fill=treatment)) +
-  scale_fill_manual(values=c("lightblue2", "seashell2"))+
-  geom_boxplot()+
-  labs(title = "yield")+
-  ylab("yield") 
-
-
-p3<-ggplot(merlot2020.pca, aes(x=treatment, y = merlot2020.quality.pc, fill=treatment)) +
-  scale_fill_manual(values=c("lightblue2", "seashell2"))+
-  geom_boxplot()+
-  labs(title = "quality")+
-  ylab("quality") 
-
-
-ggarrange(p1,p2,p3)
+plot_list4=lapply(colnames(merlot2020[-c(1:5)]), plot_resp, data=merlot2020)
+ggarrange(plotlist = plot_list4, heights = 2)
 ```
 
 3. Visualization (side by side boxplots for each response variable - block)
