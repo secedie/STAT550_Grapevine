@@ -12,6 +12,7 @@ editor_options:
 ```{r setup, include=TRUE, echo=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
 library(tidyverse)
+library(ggpubr)
 library(corrplot)
 library(icenReg) # for survival analysis
 library(knitr)
@@ -112,11 +113,8 @@ For all columns that contain missing values (yield, cluster weight, berries/clus
 
 Assigning these missing entries the value of zero seems plausible.
 
-Percentage of missing for the yield related measures of merlot2020 is shown below.
+`r paste0(round(mean(is.na(merlot2020$yield)), 3)*100, "%")` of the yield  is missing in the Merlot 2020.
 
-```{r, echo=FALSE}
-mean(is.na(merlot2020$yield))
-```
 
 ## Berry related measures
 
@@ -124,10 +122,11 @@ Similarly, for all columns that contain missing values (berry Brix, berry TA, be
 
 Due to the structure of the study, particularly the existence of blocking and replication, imputation seems to be the most reasonable approach to fill in the missing values.
 
-Percentage of missing for the berry related measures of merlot2020 is shown below.
+`r paste0(round(mean(is.na(merlot2020$berry.Brix)), 3)*100, "%")` of the bloom data in the Merlot 2020 dataset is missing.
+
 
 ```{r, echo=FALSE}
-mean(is.na(merlot2020$berry.Brix))
+#mean(is.na(merlot2020$berry.Brix))
 ```
 
 ## Question
@@ -334,6 +333,7 @@ merlot2020.pca
 
 # Check for correlations
 ### chardonnay 2019
+
 ```{r}
 chardonnay2019 %>% 
   select(-1:-5) %>% 
@@ -343,6 +343,7 @@ chardonnay2019 %>%
 From the output of correlation function, there seem no correlations between response variables.
 
 ### chardonnay 2020
+
 ```{r}
 chardonnay2020 %>% 
   select(-1:-5) %>% 
@@ -352,14 +353,29 @@ chardonnay2020 %>%
 Yield is found to be positively correlated with number of clusters.
 
 ### merlot 2019
+
 ```{r}
+## correlation matrix before PCA
+merlot2019.resp %>% 
+  cor() %>% 
+  corrplot(type = "upper", order = "hclust", tl.col = "black", tl.srt = 45, addCoef.col="white", number.cex=0.7)
+  
+## correlation matrix after PCA
 merlot2019.pca %>% 
   select(-1:-5) %>% 
   cor() %>% 
   corrplot(type = "upper", order = "hclust", tl.col = "black", tl.srt = 45, addCoef.col="white", number.cex=0.7)
 ```
+
 ### merlot 2020
+
 ```{r}
+## correlation matrix before PCA
+merlot2020.resp %>% 
+  cor() %>% 
+  corrplot(type = "upper", order = "hclust", tl.col = "black", tl.srt = 45, addCoef.col="white", number.cex=0.7)
+
+## correlation matrix after PCA
 merlot2020.pca %>% 
   select(-1:-5) %>% 
   cor() %>% 
@@ -382,7 +398,58 @@ char19.tab <- chardonnay2019 %>%
 kable(char19.tab, caption="\\label{char19.summary.table} Summary statistics for outcome variables in the Chardonnay 2019 dataset.")
 ```
 
+```{r}
+plot_resp = function(data, resp){
+  ggplot(data, aes(x=treatment, y = .data[[resp]], fill=treatment))+
+  scale_fill_manual(values=c("lightblue2", "seashell2"))+
+  labs(title = resp) +
+  ylab(" ") +
+  geom_boxplot()
+}
+
+plot_list1= lapply(colnames(char2019.resp), plot_resp, data = chardonnay2019)
+ggarrange(plotlist = plot_list1)
+
+plot_list2=lapply(colnames(char2020.resp),plot_resp, data=chardonnay2020)
+ggarrange(plotlist = plot_list2)
+
+plot_list3=lapply(colnames(merlot2019[-c(1:5)]), plot_resp, data=merlot2019)
+ggarrange(plotlist = plot_list3)
+
+plot_list4=lapply(colnames(merlot2020[-c(1:5)]), plot_resp, data=merlot2020)
+ggarrange(plotlist = plot_list4)
+```
+
+
 2. Visualization (side by side boxplots for each response variable)
+
+```{r}
+p1<- chardonnay2019 %>% 
+  ggplot(aes(x=treatment, y = X..of.clusters, fill=treatment)) +
+  scale_fill_manual(values=c("lightblue2", "seashell2"))+
+  geom_boxplot()+
+  labs(title = "number of clusters") +
+  ylab("number of clusters")
+
+p2<-chardonnay2019 %>% 
+  ggplot(aes(x=treatment, y = yield..kg., fill=treatment)) +
+  scale_fill_manual(values=c("lightblue2", "seashell2"))+
+  geom_boxplot()+
+  labs(title = "yield") +
+  ylab("yield")
+
+p3<-chardonnay2019 %>% 
+  ggplot(aes(x=treatment, y = av.cluster.weight..kg., fill=treatment)) +
+  scale_fill_manual(values=c("lightblue2", "seashell2"))+
+  geom_boxplot()+
+  labs(title = "average cluster weight") +
+  ylab("average cluster weight")
+
+ggarrange(p1,p2,p3)
+```
+
+3. Visualization (side by side boxplots for each response variable + block)
+
 ```{r}
 ## check assumptions of number of clusters
 chardonnay2019 %>% 
@@ -413,8 +480,9 @@ chardonnay2019 %>%
 ```
 ### Chardonnay 2020
 1. table of mean and variance under control and treatment for each response variable
+
 ```{r}
-chardonnay2020 %>% 
+char20.tab<-chardonnay2020 %>% 
   group_by(block, treatment) %>% 
   summarise(var.num_of_cluster=var(X..of.clusters),
             mean.num_of_cluster=mean(X..of.clusters),
@@ -422,8 +490,39 @@ chardonnay2020 %>%
             mean.yield=mean(yield..kg.),
             var.cluster_weight=var(av.cluster.weight..kg.),
             mean.cluster_weight=mean(av.cluster.weight..kg.))
+kable(char20.tab, caption="\\label{char20.summary.table} Summary statistics for outcome variables in the Chardonnay 2019 dataset.")
 ```
-2. Visualization (side by side boxplots for each response variable)
+
+2. Visualization (side by side boxplots for each response variable) 
+```{r}
+p1<-chardonnay2020 %>% 
+  ggplot(aes(x=treatment, y = X..of.clusters, fill=treatment))+
+  scale_fill_manual(values=c("lightblue2", "seashell2"))+
+  geom_boxplot()+
+  labs(title = "number of clusters") +
+  ylab("number of clusters")
+
+## check assumptions of yield
+p2<-chardonnay2020 %>% 
+  ggplot(aes(x=treatment, y = yield..kg., fill=treatment)) +
+  scale_fill_manual(values=c("lightblue2", "seashell2"))+
+  geom_boxplot()+
+  labs(title = "yield") +
+  ylab("yield")
+
+## check assumptions for average cluster weight
+p3<-chardonnay2020 %>% 
+  ggplot(aes(x=treatment, y = av.cluster.weight..kg., fill=treatment)) +
+  scale_fill_manual(values=c("lightblue2", "seashell2"))+
+  geom_boxplot()+
+  labs(title = "average cluster weight") +
+  ylab("average cluster weight")
+
+ggarrange(p1,p2,p3)
+```
+
+3. Visualization (side by side boxplots for each response variable - block)
+
 ```{r}
 ## check assumptions of number of clusters
 chardonnay2020 %>% 
@@ -453,9 +552,11 @@ chardonnay2020 %>%
   facet_wrap(~block) 
 ```
 ### merlot 2019
+
 1. table of mean and variance under control and treatment for each response variable
+
 ```{r}
-merlot2019.pca %>% 
+mer19.tab<-merlot2019.pca %>% 
   group_by(block, treatment) %>% 
   summarise(var.growth=var(merlot2019.growth.pc),
             mean.growth=mean(merlot2019.growth.pc),
@@ -465,10 +566,38 @@ merlot2019.pca %>%
             mean.quality=mean(merlot2019.quality.pc),
             var.yield=var(merlot2019.pruning.pc),
             mean.yield=mean(merlot2019.pruning.pc))
-
+kable(mer19.tab, caption="\\label{mer19.summary.table} Summary statistics for outcome variables in the Chardonnay 2019 dataset.")
 ```
 
 2. Visualization (side by side boxplots for each response variable)
+
+```{r}
+p1<-ggplot(merlot2019.pca, aes(x=treatment, y = merlot2019.growth.pc, fill=treatment)) +
+  scale_fill_manual(values=c("lightblue2", "seashell2"))+
+  geom_boxplot()+
+  labs(title = "growth") +
+  ylab("growth")
+
+p2<-ggplot(merlot2019.pca, aes(x=treatment, y = merlot2019.yield.pc, fill=treatment)) +
+  scale_fill_manual(values=c("lightblue2", "seashell2"))+
+  geom_boxplot()+
+  labs(title = "yield") 
+
+p3<-ggplot(merlot2019.pca, aes(x=treatment, y = merlot2019.quality.pc, fill=treatment)) +
+  scale_fill_manual(values=c("lightblue2", "seashell2"))+
+  geom_boxplot()+
+  labs(title = "quality") 
+
+p4<-ggplot(merlot2019.pca, aes(x=treatment, y = merlot2019.pruning.pc, fill=treatment)) +
+  scale_fill_manual(values=c("lightblue2", "seashell2"))+
+  geom_boxplot()+
+  labs(title = "pruning") 
+
+ggarrange(p1,p2,p3,p4)
+```
+
+3. Visualization (side by side boxplots for each response variable - block)
+
 ```{r}
 ggplot(merlot2019.pca, aes(x=treatment, y = merlot2019.growth.pc, fill=treatment)) +
   scale_fill_manual(values=c("lightblue2", "seashell2"))+
@@ -498,8 +627,9 @@ ggplot(merlot2019.pca, aes(x=treatment, y = merlot2019.pruning.pc, fill=treatmen
 
 ### merlot 2020
 1. table of mean and variance under control and treatment for each response variable
+
 ```{r}
-merlot2020.pca %>% 
+mer20.tab<-merlot2020.pca %>% 
   group_by(block, treatment) %>% 
   summarise(var.growth=var(merlot2020.growth.pc),
             mean.growth=mean(merlot2020.growth.pc),
@@ -507,9 +637,37 @@ merlot2020.pca %>%
             mean.yield=mean(merlot2020.yield.pc),
             var.quality=var(merlot2020.quality.pc),
             mean.quality=mean(merlot2020.quality.pc))
+kable(mer20.tab, caption="\\label{char19.summary.table} Summary statistics for outcome variables in the Chardonnay 2019 dataset.")
 ```
 
 2. Visualization (side by side boxplots for each response variable)
+
+```{r}
+p1<-ggplot(merlot2020.pca, aes(x=treatment, y = merlot2020.growth.pc, fill=treatment)) +
+  scale_fill_manual(values=c("lightblue2", "seashell2"))+
+  geom_boxplot()+
+  labs(title = "growth") +
+  ylab("growth") 
+
+p2<-ggplot(merlot2020.pca, aes(x=treatment, y = merlot2020.yield.pc, fill=treatment)) +
+  scale_fill_manual(values=c("lightblue2", "seashell2"))+
+  geom_boxplot()+
+  labs(title = "yield")+
+  ylab("yield") 
+
+
+p3<-ggplot(merlot2020.pca, aes(x=treatment, y = merlot2020.quality.pc, fill=treatment)) +
+  scale_fill_manual(values=c("lightblue2", "seashell2"))+
+  geom_boxplot()+
+  labs(title = "quality")+
+  ylab("quality") 
+
+
+ggarrange(p1,p2,p3)
+```
+
+3. Visualization (side by side boxplots for each response variable - block)
+
 ```{r}
 ggplot(merlot2020.pca, aes(x=treatment, y = merlot2020.growth.pc, fill=treatment)) +
   scale_fill_manual(values=c("lightblue2", "seashell2"))+
