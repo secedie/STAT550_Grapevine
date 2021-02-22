@@ -13,11 +13,8 @@ editor_options:
 knitr::opts_chunk$set(echo = FALSE)
 library(tidyverse)
 library(corrplot)
-<<<<<<< HEAD
 library(icenReg) # for survival analysis
-=======
 library(survival)
->>>>>>> 98f28ba8c000f0238f1fd850ce8f9ada1cccf796
 library(knitr)
 library(lawstat) # for the levene test
 ```
@@ -697,11 +694,8 @@ for (i in 1:length(resp.mer)) {
 ```
 
 
-<<<<<<< HEAD
 # Checking assumptions for statistical tests
-=======
 # Assumptions
->>>>>>> 98f28ba8c000f0238f1fd850ce8f9ada1cccf796
 
 We will be running ANOVAs on all outcome variables except Bloom and Veraison to determine whether the treatment influenced the outcome variables. ANOVA tests have two main assumptions:
 
@@ -711,11 +705,8 @@ We will be running ANOVAs on all outcome variables except Bloom and Veraison to 
 4. Equal sample size: each combination of the treatment and blocking factors have equal sample sizes.
 
 ## Homoscedasticity
-
 ```{r homoscedas.merlot}
-
 library(lawstat)
-<<<<<<< HEAD
 # Create lists of the variables we want to check for homoscedasticity and normality
 resp.mer19 <- colnames(merlot2019)[-c(1:5, 7)]
 resp.mer20 <- colnames(merlot2020)[-c(1:5, 7,9)]
@@ -745,7 +736,7 @@ for (i in 1:length(resp.mer19)) {
 
 
 # Check out how many of the tests came back with a significant result
-uneq.var.mer19 <- apply(homosc.table.mer20, c(1,2), function(x){sum(x<0.05)})
+uneq.var.mer19 <- apply(homosc.table.mer19, c(1,2), function(x){sum(x<0.05)})
 
 # Boxplots of the first imputation dataset for the variables with potentially
 # unequal variances
@@ -754,7 +745,6 @@ lapply(rownames(uneq.var.mer19)[rowSums(uneq.var.mer19)>0], function(x){
   with(merlot2019mice, 
        boxplot(cluster.weight ~ paste0(block, treatment))
        )[[1]]})
-
 
 ```
 
@@ -783,10 +773,9 @@ for (var in rownames(uneq.var.mer20)[rowSums(uneq.var.mer20)>0]) {
   #            which(colnames(merlot2020) %in% c("block", "treatment"))]
   
   # Plot the non-imputed data
-  plot(split(merlot2020[,which(colnames(merlot2020==var))],
+  plot(split(merlot2020[,which(colnames(merlot2020)==var)],
              paste0(merlot2020$block, merlot2020$treatment)))
-
-=======
+}
 resp.mer19 <- colnames(merlot2019)[-c(1:5, 7)]
 resp.mer20 <- colnames(merlot2020)[-c(1:5, 7:8)]
 
@@ -815,12 +804,10 @@ for (i in 1:length(resp.mer)) {
   p.2 <- levene.test(var[!is.na(var)], 
                      as.factor(mer$block[!is.na(var)]))$p.value
   print(paste(resp.mer[i], round(p, 3), round(p.2, 3)))
->>>>>>> 98f28ba8c000f0238f1fd850ce8f9ada1cccf796
 }
 
 ```
 
-<<<<<<< HEAD
 
 ```{r homoscedas.chardonnay}
 
@@ -859,8 +846,8 @@ for (i in 1:length(resp.char20)) {
 par(mar=c(4,4,3,3))
 boxplot(chardonnay2019$X..of.clusters ~ chardonnay2019$treatment + chardonnay2019$block,
         xlab="Treatment + Block", ylab="Number of clusters")
+```
 
-=======
 ```{r homoscedas.char}
 
 # Compare variance between treatment
@@ -877,17 +864,15 @@ for (i in 1:length(resp.char)) {
   p <- bartlett.test(char[,which(names(char)==resp.char[i])] ~ char$block)$p.value
   print(paste(resp.char[i], p))
 }
->>>>>>> 98f28ba8c000f0238f1fd850ce8f9ada1cccf796
 ```
 
 ## Normality
 
-<<<<<<< HEAD
 We used Shapiro-Wilkes tests to check the normality assumption of the ANOVA tests, checking each block-treatment combination for each of the tested variables. For any Shapiro-Wilkes tests that resulted in a potentially significant breach from normality, the Q-Q plots were plotted (Figures \ref{qq.mer19}, \ref{qq.mer20}, \ref{qq.char19}, \ref{qq.char20}).
 
 Upon observations of the Q-Q plots, it looks like deviations are largely due to outliers. This may pose a problem in the accuracy of the ANOVA tests as ANOVA can be sensitive to outliers. 
 
-```{r qq.mer19 fig.cap="\\label{qq.mer19} Q-Q plots for treatment-block groups in the Merlot 2019 data that indicated a potentially significant breach from normality. The number in the title for each plot indicates the block, followed by the treatment and the variable in question."}
+```{r qq.mer19, fig.cap="\\label{qq.mer19} Q-Q plots for treatment-block groups in the Merlot 2019 data that indicated a potentially significant breach from normality. The number in the title for each plot indicates the block, followed by the treatment and the variable in question."}
 
 # Run shapiro-wilkes tests on each of the variables we will run ANOVAs on
 norm.tests.mer19 <- array(NA, c(12, length(resp.mer19)))
@@ -918,7 +903,7 @@ for (i in 1:dim(non.norm)[1]) {
 
 ```
 
-```{r qq.mer20 fig.cap="\\label{qq.mer20} Q-Q plots for treatment-block groups in the Merlot 2020 data that indicated a potentially significant breach from normality. The number in the title for each plot indicates the block, followed by the treatment and the variable in question. Imputed data points are plotted in red."}
+```{r qq.mer20, fig.cap="\\label{qq.mer20} Q-Q plots for treatment-block groups in the Merlot 2020 data that indicated a potentially significant breach from normality. The number in the title for each plot indicates the block, followed by the treatment and the variable in question. Imputed data points are plotted in red."}
 
 # Run shapiro-wilkes tests on each of the variables
 norm.tests.mer20 <- array(NA, c(12, length(resp.mer20), 5))
@@ -968,7 +953,7 @@ for (i in 1:dim(nonnorm.mer20.rowcol)[1]) {
 ```
 
 
-```{r qq.char19 fig.cap="\\label{qq.char19} Q-Q plots for treatment-block groups in the Chardonnay 2019 data that indicated a potentially significant breach from normality. The number in the title for each plot indicates the block, followed by the treatment and the variable in question."}
+```{r qq.char19, fig.cap="\\label{qq.char19} Q-Q plots for treatment-block groups in the Chardonnay 2019 data that indicated a potentially significant breach from normality. The number in the title for each plot indicates the block, followed by the treatment and the variable in question."}
 
 # Run shapiro-wilkes tests on each of the variables we will run ANOVAs on
 norm.tests.char19 <- array(NA, c(10, length(resp.char19)))
@@ -999,7 +984,7 @@ for (i in 1:dim(non.norm)[1]) {
 
 ```
 
-```{r qq.char20 fig.cap="\\label{qq.char19} Q-Q plots for treatment-block groups in the Chardonnay 2019 data that indicated a potentially significant breach from normality. The number in the title for each plot indicates the block, followed by the treatment and the variable in question."}
+```{r qq.char20, fig.cap="\\label{qq.char19} Q-Q plots for treatment-block groups in the Chardonnay 2019 data that indicated a potentially significant breach from normality. The number in the title for each plot indicates the block, followed by the treatment and the variable in question."}
 
 # Run shapiro-wilkes tests on each of the variables we will run ANOVAs on
 norm.tests.char20 <- array(NA, c(10, length(resp.char20)))
@@ -1026,7 +1011,9 @@ for (i in 1:dim(non.norm)[1]) {
   qqnorm(chardonnay2020[which(paste(chardonnay2020$block, chardonnay2020$treatment)==non.norm[i,1]),non.norm[i,2]],
          main=paste("Q-Q plot:", non.norm[i,1], non.norm[i,2]))
   qqline(chardonnay2020[which(paste(chardonnay2020$block, chardonnay2020$treatment)==non.norm[i,1]),non.norm[i,2]])
-=======
+}
+```
+
 ```{r qq.mer}
 
 # Check normality
@@ -1038,12 +1025,10 @@ for (i in 1:length(resp.mer)) {
 for (i in 1:length(resp.mer)) {
   qqnorm(mer[mer$treatment=="control",which(names(mer)==resp.mer[i])], cex.main=0.9, main=resp.mer[i])
   qqline(mer[mer$treatment=="control",which(names(mer)==resp.mer[i])], cex.main=0.9, main=resp.mer[i])
->>>>>>> 98f28ba8c000f0238f1fd850ce8f9ada1cccf796
 }
 
 ```
 
-<<<<<<< HEAD
 
 # Statistical analyses
 
@@ -1146,11 +1131,9 @@ coxph.ver19 <- lapply(icen.mer19, function(x){
 Results indicate that neither the treatment nor the block effects influenced Veraison in either 2019 or 2020. Bloom was influenced by block effect but not by the treatment.
 
 ## Aligned rank transform ANOVA (nonparametric test for two-way layout) and ANOVA test
-=======
 # Statistical analyses
 
 # Aligned rank transform ANOVA (nonparametric test for two-way layout) and ANOVA test
->>>>>>> 98f28ba8c000f0238f1fd850ce8f9ada1cccf796
 
 ### Chardonnay 2019 number of clusters
 ```{r, echo=FALSE}
