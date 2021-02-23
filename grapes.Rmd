@@ -231,9 +231,9 @@ Again the veraison values are all above zero, and so zero values will assigned b
 We therefore won't need to do imputation on veraison altogether, and so can proceed for now using the following three sets of data (merlot2019, merlot2020 imputed with filled-in zeros, merlot2020 imputed without filled-in zeros).
 
 ```{r, include=FALSE}
-merlot2019$veraison[is.na(merlot2019$veraison)] = 0
-
-merlot2020$veraison[which(is.na(merlot2020$veraison) & merlot2020$cluster.number > 0)] = 0
+# merlot2019$veraison[is.na(merlot2019$veraison)] = 0
+# 
+# merlot2020$veraison[which(is.na(merlot2020$veraison) & merlot2020$cluster.number > 0)] = 0
 
 predMatrix = matrix(rep(1,ncol(merlot2020)^2), ncol(merlot2020), ncol(merlot2020))
 diag(predMatrix) = 0
@@ -282,7 +282,7 @@ var_explained = (res$sdev^2/(sum(res$sdev^2)))[1] # 0.78826
 merlot2019.pruning <- select(merlot2019.resp,(11:12))
 res <- prcomp(merlot2019.pruning, center = TRUE, scale = TRUE)
 merlot2019.pruning.pc <- res$x[,1]
-var_explained = (res$sdev^2/(sum(res$sdev^2)))[1] # 0.9996358
+var_explained = (res$sdev^2/(sum(res$sdev^2)))[1] # 0.803176
 
 # 2020
 merlot2020.growth <- select(merlot2020.resp,c(1:4,13))
@@ -750,6 +750,8 @@ for (i in 1:length(resp.mer)) {
 ```
 
 
+
+
 # Checking assumptions for statistical tests
 
 We will be running ANOVAs on all outcome variables except Bloom and Veraison to determine whether the treatment influenced the outcome variables. ANOVA tests have two main assumptions:
@@ -1041,101 +1043,131 @@ for (i in 1:dim(non.norm)[1]) {
 
 ## Cox PH models for censored data
 
-As previously discussed, Bloom and Veraison were both censored data for the Merlot datasets. For some of the plants, 100% bloom or veraison had already occurred, so the event (50% bloom or veraison) was left-censored. For other plants, the berries or flowers had not yet grown, indicating right-censoring (the event had not yet been observed). 
+As previously discussed, Bloom and Veraison were both censored data for the Merlot datasets. For some of the plants, 100% bloom or veraison had already occurred, so the event (50% bloom or veraison) was left-censored. For other plants, the berries or flowers had not yet grown, indicating that the event was right-censored (the event had not yet been observed). In this analysis, we discern the two groups by whether or not the number of clusters reported is greater than or equal to zero. If there were no clusters, then we assume right-censoring; otherwise, we assume left-censoring.
 
-Both bloom and veraison were measured three times (at times T1, T2, and T3, let's say), and the approximate event date (50% veraison or 50% bloom) was determined using a linear regression. There are two types of missing data: 
+Both bloom and veraison were measured three times (at times T1, T2, and T3), and the approximate event date (50% veraison or 50% bloom) was determined using a linear regression. There are two types of missing data: 
 
 (1) The event did not occur because no berries or flowers grew. This is known as right-censored data. In this case, the event happened in the interval (T3,Inf)
 (2) The event already occurred prior to the first observation. This is known as left-censored data. In this case, the event happened sometime in the interval (-Inf, T1].
 
-We have been in contact with the client to try to determine the exact T1 and T3 for each of the dates. However, in the absence of this data, we can use Multiple Imputation as our T1 and T3 dates. Additionally, for veraison, until we hear from the client, we can impute the lower bound of the interval for left-censored data as the 50% bloom date.
+For Bloom, T1= June 25 (= 25); T2=June 29 (= 29), and T3= July 1 (= 31)
+For Veraison, T1=August 31 (= 31), T2=September 2 (= 33), and T3=September 5 (36).
+
+Additionally, for veraison, until we hear from the client, we can impute the lower bound of the interval for left-censored data as the 50% bloom date, since we know berry ripening would happen sometime after flowers blooming.
 
 After treating the data as interval data, we can then construct Cox proportional hazards models to fit the data. We used tools in an R package called icenReg, which uses bootstrapping for inference on the regression parameters to perform hypothesis testing.
 
 ```{r surv.2020}
 
+bloom.t1 <- 25
+bloom.t3 <- 31
+ver.t1 <- 31
+ver.t3 <- 36
+
 # First define our dataset of start and end times for our event intervals
-icen.mer20 <- with(merlot2020mice, {
+icen.mer20 <- with(merlot2020, {
   
   # If the data isn't censored (non-NA bloom), let the start and end be equal to each other
   icen.mer20 <- data.frame("bloom.start"=bloom, "bloom.end"=bloom,
-                           "verais.start"=veraison, "verais.end"=veraison)
+                           "verais.start"=veraison, "verais.end"=veraison,
+                           "trt"=treatment, "block"=block)
 
   # If the data is right-censored (cluster.number==0; event happened after
   # the study period of interest), then let the "start" be the imputed value
   # and set the ending value to Inf
-  icen.mer20$bloom.end[is.na(merlot2020$bloom) & cluster.number==0] <- Inf
-  icen.mer20$verais.end[is.na(merlot2020$veraison) & cluster.number==0] <- Inf
+  icen.mer20$bloom.start[is.na(bloom) & cluster.number==0] <- bloom.t3
+  icen.mer20$bloom.end[is.na(bloom) & cluster.number==0] <- Inf
+  
+  icen.mer20$verais.start[is.na(veraison) & cluster.number==0] <- ver.t3
+  icen.mer20$verais.end[is.na(veraison) & cluster.number==0] <- Inf
   
   # If the data is left-censored (event happened before we started recording Veraison)
   # (cluster.number>0), then let the "end" be the imputed value and
   # set the starting value to -Inf
   # For veraison, we can set the starting value to the max of -Inf and the 50% bloom date
-  left.bloom <- is.na(merlot2020$bloom) & cluster.number>0
+  left.bloom <- is.na(bloom) & cluster.number>0
   icen.mer20$bloom.start[left.bloom] <- -Inf
-  left.ver <- is.na(merlot2020$veraison) & cluster.number>0
-  icen.mer20$verais.start[left.ver] <- max(merlot2020$bloom[left.ver]-61,
-                                           -Inf, na.rm=T)
+  icen.mer20$bloom.end[left.bloom] <- bloom.t1
+  
+  left.ver <- is.na(veraison) & cluster.number>0
+  icen.mer20$verais.start[left.ver] <- max(bloom[left.ver]-61, -Inf, na.rm=T)
+  icen.mer20$verais.end[left.ver] <- ver.t1
   return(icen.mer20)
-  })$analyses
+  })
 
 
 library(icenReg)
 # Build a model for the bloom data
-coxph.bloom20 <- lapply(icen.mer20, function(x){
-  bloom20 <- data.frame("s"=x$bloom.start, "e"=x$bloom.end)
-  # Fit a cox-PH model
-  cox.fit <- ic_sp(cbind(s,e) ~ merlot2020$treatment + merlot2020$block, 
-               data=bloom20, model='ph', bs_samples=100)
-  return(cox.fit)
-  })
+coxph.bloom20 <- ic_sp(cbind(bloom.start,bloom.end) ~ trt + as.factor(block), 
+               data=icen.mer20, model='ph', bs_samples=100)
 
 # Build a model for the veraison data
-coxph.ver20 <- lapply(icen.mer20, function(x){
-  ver20 <- data.frame("s"=x$verais.start, "e"=x$verais.end)
-  # Fit a cox-PH model
-  cox.fit <- ic_sp(cbind(s,e) ~ merlot2020$treatment + merlot2020$block, 
-               data=ver20, model='ph', bs_samples=100)
-  return(cox.fit)
-  })
+coxph.ver20 <- ic_sp(cbind(verais.start,verais.end) ~ trt + as.factor(block), 
+               data=icen.mer20, model='ph', bs_samples=100)
+
 
 ```
 
 ```{r surv.2019}
 
 # First define our dataset of start and end times for our event intervals
-icen.mer19 <- with(merlot2019mice, {
+icen.mer19 <- with(merlot2019, {
   
   # If the data isn't censored (non-NA bloom), let the start and end be equal to each other
-  icen.mer19 <- data.frame("verais.start"=veraison, "verais.end"=veraison)
+  icen.mer19 <- data.frame("verais.start"=veraison, "verais.end"=veraison,
+                           "trt"=treatment, "block"=block)
 
   # If the data is right-censored (cluster.number==0; event happened after
-  # the study period of interest), then let the "start" be the imputed value
+  # the study period of interest), then let the "start" be the T3 value
   # and set the ending value to Inf
+  icen.mer19$verais.start[is.na(merlot2019$veraison) & cluster.number==0] <- ver.t1
   icen.mer19$verais.end[is.na(merlot2019$veraison) & cluster.number==0] <- Inf
   
+  
   # If the data is left-censored (event happened before we started recording Veraison)
-  # (cluster.number>0), then let the "end" be the imputed value and
+  # (cluster.number>0), then let the "end" be T3 and
   # set the starting value to -Inf
   left.ver <- is.na(merlot2019$veraison) & cluster.number>0
   icen.mer19$verais.start[left.ver] <- -Inf
+  icen.mer19$verais.end[left.ver] <- ver.t3
   
   return(icen.mer19)
-  })$analyses
+  })
 
 # Build a model for the veraison data
-coxph.ver19 <- lapply(icen.mer19, function(x){
-  ver19 <- data.frame("s"=x$verais.start, "e"=x$verais.end)
-  # Fit a cox-PH model
-  cox.fit <- ic_sp(cbind(s,e) ~ merlot2019$treatment + merlot2019$block, 
-               data=ver19, model='ph', bs_samples=100)
-  return(cox.fit)
-  })
+coxph.ver19 <- ic_sp(cbind(verais.start,verais.end) ~ trt + as.factor(block), 
+                  data=icen.mer19, model='ph', bs_samples=100)
 
 
 ```
 
 Results indicate that neither the treatment nor the block effects influenced Veraison in either 2019 or 2020. Bloom was influenced by block effect but not by the treatment.
+
+### Visual  analysis: censored data
+
+```{r fig.cap="\\label{plot.ver} Probability of 50% Veraison happening x days into July for the Merlot 2019 and Merlot 2020 vineyard."}
+
+colorsch <- c("darksalmon", "red", "darkred", "cornflowerblue", "darkcyan", "darkblue")
+newdata <- data.frame(trt=c(rep("heat", 3), rep("control", 3)), "block"=as.character(1:6))
+rownames(newdata) <- paste(newdata$trt, newdata$block)
+
+par(mfrow=c(1,2))
+plot(coxph.ver19, newdata, col=colorsch, lgdLocation="bottomleft", main="2019 Veraison")
+plot(coxph.ver20, newdata, col=colorsch, lgdLocation="bottomleft", main="2020 Veraison")
+
+
+```
+
+```{r fig.cap="\\label{plot.ver} Probability of 50% Bloom happening x days into July for the Merlot 2020 vineyard."}
+
+par(mfrow=c(1,1))
+plot(coxph.bloom20, newdata, col=colorsch, lgdLocation="bottomleft", main="Bloom")
+
+
+```
+
+Censored data cannot be as adequately assessed visually using boxplots. A more appropriate method is to construct nonparametric maximum likelihood estimators. The resulting plots are shown in Figures \ref{np.ver} and \ref{np.bloom}. 
+
 
 ## Aligned rank transform ANOVA (nonparametric test for two-way layout) and ANOVA test
 
@@ -1154,6 +1186,7 @@ summary(aov(X..of.clusters ~ treatment + block + treatment:block, data = dat))
 ```
 
 ### Chardonnay 2019 yield
+
 ```{r, echo=FALSE}
 ### Aligned rank transform ANOVA
 library(ARTool)
@@ -1308,6 +1341,35 @@ print(res)
 
 ### ANOVA
 summary(aov(merlot2020.quality.pc ~ treatment + block + treatment:block, data = dat))
+```
+### Merlot individual factors
+
+```{r}
+
+library(ARTool)
+
+art.model.mer20 <- vector("list", length(resp.mer20))
+anova.mer20 <- vector("list", length(resp.mer20))
+names(anova.mer20) <- resp.mer20
+names(art.model.mer20) <- resp.mer20
+
+for (i in 1:length(resp.mer20)) {
+  art.model.mer20[[i]] = art(eval(parse(text=resp.mer20[i])) ~ treatment + block + treatment:block,
+                             data=complete(merlot2020mice, 1))
+  anova.mer20[[i]] = anova(art.model.mer20[[i]], type = 1)
+}
+
+anova.mer20 <- lapply(anova.mer20, function(x){as.data.frame(x[,-1])})
+anova.mer20 <- lapply(1:length(anova.mer20), 
+                      function(x){cbind(anova.mer20[[x]], 
+                                        data.frame("Var"=rep(names(anova.mer20)[x],3),
+                                                   "Covar"=rownames(anova.mer20[[x]])))})
+
+anova.mer20 <- do.call(rbind.data.frame, anova.mer20)
+
+library(maditr)
+dcast(anova.mer20, Var~Covar, value.var="Pr(>F)")
+
 ```
 
 Only one treatment effect was found significant (growth in merlot 2020). Although some of the interaction effects are. Maybe heating only helps under certain geographical conditions? 
