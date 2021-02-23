@@ -82,243 +82,12 @@ There are 60 samples in each of the Merlot 2019 and Merlot 2020 datasets. The 60
 
 In the Merlot 2019 data set, there are missing values from the measurement of veraison. In the Merlot 2020 data set, there are missing vales from the measurements of veraison, bloom, yield, cluster weight, berries/cluster, berry weight, berry Brix, berry TA, berry pH, and brown seed color.
 
-# Handling missing data
-
-As mentioned above, missing data was unique to the Merlot datasets.
-
-## Veraison
-
-We know from the client that the veraison column indicates the number days into August in each respective year when 50% of the berries on a given vine had changed to red. If the corresponding cluster number is greater than zero, then the missing entries are a result of the vines reaching 50% veraison on the first day of measurement. They are missing not at random (MNAR) as whether this value is missing for each vine is dependent on this particular value. More specifically, if any of the missing values were recorded, it must be negative. If the corresponding cluster number is zero, then the missing entries are missing completely at random (MCAR) as there were no clusters to measure.
-
-While imputation seems like a reasonable approach, since we know these values must be negative for those whose cluster numbers are not zero, we can take the maximum between each imputed value and zero to produce complete data sets. And for those whose cluster numbers are zero, we can perform imputation normally.
-
-Percentage of missing for the veraison measure of merlot2019 and merlot2020 are shown in Table \ref{missing.percent}.
-
-```{r missing.percent, echo=FALSE}
-kable(data.frame("Missing 2019"=paste0(round(mean(is.na(merlot2019$veraison)), 3)*100, "%"), 
-                 "Missing 2020"=paste0(round(mean(is.na(merlot2020$veraison)), 3)*100), "%"),
-      caption="\\label{missing.percent} Percentage of Veraison data that is missing in the 2019 and 2020 Merlot datasets.")
-```
-
-## Bloom
-
-Similar to veraison, the bloom column includes values that indicate the number of days into June in each respective year when 50% of the flowers on a given vine had started to bloom. The missing entries are a result of the vines reaching 50% bloom on the first day of measurement. They are also missing not at random (MNAR). Since there is no information on whether each vine has flowers, we make the assumption that there are for the time being.
-
-Again, we can consider taking the maximum between each imputed value and zero to produce complete data sets.
-
-`r paste0(round(mean(is.na(merlot2020$bloom)), 3)*100, "%")` of the bloom data in the Merlot 2020 dataset is missing.
-
-## Yield related measures
-
-For all columns that contain missing values (yield, cluster weight, berries/cluster, berry weight), the reason for missing is that the vine had no yield. Assigning these missing entries the value of zero seems plausible.
-
-`r paste0(round(mean(is.na(merlot2020$yield)), 3)*100, "%")` of the yield is missing in the Merlot 2020.
-
-
-## Berry related measures
-
-Similarly, for all columns that contain missing values (berry Brix, berry TA, berry pH, brown seed color), the reason for missing is that the vine had no yield. These values are missing simply because there were no grapes produced to have these measurements recorded. Depending on the relationship between berry quality and yield, this is either a case of missing at random (MAR, in the absence of an association between berry quality and yield) or missing completely at random (MCAR, in the presence of an association between berry quality and yield). 
-
-Due to the structure of the study, particularly the existence of blocking and replication, imputation seems to be the most reasonable approach to fill in the missing values.
-
-`r paste0(round(mean(is.na(merlot2020$berry.Brix)), 3)*100, "%")` of the bloom data in the Merlot 2020 dataset is missing.
-
-## Question
-
-In the merlot2020 data set, most of the vines that had no entries for bloom or veraison (implying earlier ripening) also had no yield. This is against my intuition. If anything, as observed in the other three data sets, early ripening may be associated with higher yield? What was the weather event that caused some of the vines to have no yield?
-
-# Constructing complete data sets
-
-We construct complete data sets using the approaches described above. Once these complete data sets are constructed, analysis can be done separately on each of the imputed data sets. Although we need to look into the necessity and methods to aggregate these results. We should also look into the order or columns to impute, as well as whether all responses should be used to predict the missing values.
-
-For now, I have imputed with and without the yield related measures. We may consider more variants such as using only responses that are highly correlated.
-
-Linear regerssions are used for imputation. There are a lot more available options specified on page 76 of https://cran.r-project.org/web/packages/mice/mice.pdf.
-
-Note that the the columns of key, row and subsample are excluded from all imputations below.
-
-## merlot2019
-
-The imputed values of veraison for merlot2019 from the first imputed data set are shown below. Note they are all above zero, they will all be filled in with zero before the analysis.
-
-```{r, include=FALSE}
-# load mice
-library(mice)
-
-# imputing veraison for merlot2019 using all responses (exclusing key, row and subsample)
-predMatrix = matrix(rep(1,ncol(merlot2019)^2), ncol(merlot2019), ncol(merlot2019))
-diag(predMatrix) = 0
-predMatrix[,1] = 0
-predMatrix[,4] = 0
-predMatrix[,5] = 0
-merlot2019mice = mice(data = merlot2019, predictorMatrix = predMatrix, seed = 1, method = "norm.predict")
-```
-
-```{r, echo=FALSE}
-# checking imputed values
-merlot2019full_1 = complete(merlot2019mice, 1)
-print(merlot2019full_1$veraison[is.na(merlot2019$veraison)])
-```
-
-## merlot2020
-
-```{r, include=FALSE}
-# filling in zero for yield related entries
-merlot2020$yield[is.na(merlot2020$yield)] = 0
-merlot2020$cluster.weight[is.na(merlot2020$cluster.weight)] = 0
-merlot2020$berries.cluster[is.na(merlot2020$berries.cluster)] = 0
-merlot2020$berry.weight[is.na(merlot2020$berry.weight)] = 0
-
-# imputation for merlot2020 using all responses (excluding key, row and subsample)
-predMatrix = matrix(rep(1,ncol(merlot2020)^2), ncol(merlot2020), ncol(merlot2020))
-diag(predMatrix) = 0
-predMatrix[,1] = 0
-predMatrix[,4] = 0
-predMatrix[,5] = 0
-merlot2020mice = mice(data = merlot2020, predictorMatrix = predMatrix, seed = 1, method = "norm.predict")
-
-# imputation for merlot2020 not using yield related columns (also excluding key, row and subsample)
-predMatrix[,c(11,14)] = 0
-merlot2020miceNoYield = mice(data = merlot2020, predictorMatrix = predMatrix, seed = 1, method = "norm.predict")
-```
-
-The first set of imputed values for merlot2020 using all responses are shown below.
-
-```{r, echo=FALSE}
-# checking imputed values
-merlot2020full_1 = complete(merlot2020mice, 1)
-
-print("veraison")
-print(merlot2020full_1$veraison[is.na(merlot2020$veraison)])
-
-print("berry Brix")
-print(merlot2020full_1$berry.Brix[is.na(merlot2020$berry.Brix)])
-
-print("berry pH")
-print(merlot2020full_1$berry.pH[is.na(merlot2020$berry.pH)])
-
-print("berry TA")
-print(merlot2020full_1$berry.TA[is.na(merlot2020$berry.TA)])
-
-print("brown seed color")
-print(merlot2020full_1$brown.seed.color[is.na(merlot2020$brown.seed.color)])
-```
-
-The first set of imputed values for merlot2020 not using yield related measures are shown below.
-
-```{r, echo=FALSE}
-# checking imputed values
-merlot2020full_1 = complete(merlot2020miceNoYield, 1)
-
-print("veraison")
-print(merlot2020full_1$veraison[is.na(merlot2020$veraison)])
-
-print("berry Brix")
-print(merlot2020full_1$berry.Brix[is.na(merlot2020$berry.Brix)])
-
-print("berry pH")
-print(merlot2020full_1$berry.pH[is.na(merlot2020$berry.pH)])
-
-print("berry TA")
-print(merlot2020full_1$berry.TA[is.na(merlot2020$berry.TA)])
-
-print("brown seed color")
-print(merlot2020full_1$brown.seed.color[is.na(merlot2020$brown.seed.color)])
-```
-
-Again the veraison values are all above zero, and so zero values will assigned before conducting the analysis.
-
-We therefore won't need to do imputation on veraison altogether, and so can proceed for now using the following three sets of data (merlot2019, merlot2020 imputed with filled-in zeros, merlot2020 imputed without filled-in zeros).
-
-```{r, include=FALSE}
-# merlot2019$veraison[is.na(merlot2019$veraison)] = 0
-# 
-# merlot2020$veraison[which(is.na(merlot2020$veraison) & merlot2020$cluster.number > 0)] = 0
-
-predMatrix = matrix(rep(1,ncol(merlot2020)^2), ncol(merlot2020), ncol(merlot2020))
-diag(predMatrix) = 0
-predMatrix[,1] = 0
-predMatrix[,4] = 0
-predMatrix[,5] = 0
-merlot2020mice = mice(data = merlot2020, predictorMatrix = predMatrix, seed = 1, method = "norm.predict")
-```
-
-Check out the imputed data sets in the code blocks!
-
-```{r, include=FALSE}
-merlot2019 # this is now complete
-merlot2020<-complete(merlot2020mice, 1) # first (out of 5) imputed data set for merlot2020 using all responses including the filled-in zeros
-# complete(merlot2020miceNoZero, 1) # first (out of 5) imputed data set for merlot2020 without the filled-in zeros
-```
-
-## data preprocessing - PCA
-Basically, we have reduced the dimensions of the dataset down to four/three dimensions for merlot 2013/2014 using PCA.
 ```{r, include=FALSE}
 # carry forward with the following data sets (response variables only)
 char2019.resp <- select(chardonnay2019,(-1:-5))
 char2020.resp <- select(chardonnay2020, (-1:-5))
 merlot2019.resp <- select(merlot2019,(-1:-5))
-merlot2020.resp <- select(complete(merlot2020mice, 1),(-1:-5))
-```
-
-```{r, include=FALSE}
-# extracting features
-# 2019
-merlot2019.growth <- select(merlot2019.resp,(1:2))
-res <- prcomp(merlot2019.growth, center = TRUE, scale = TRUE)
-merlot2019.growth.pc <- res$x[,1]
-var_explained = (res$sdev^2/(sum(res$sdev^2)))[1] # 0.9577232
-
-merlot2019.yield <- select(merlot2019.resp,(3:7))
-res <- prcomp(merlot2019.yield, center = TRUE, scale = TRUE)
-merlot2019.yield.pc <- res$x[,1]
-var_explained = (res$sdev^2/(sum(res$sdev^2)))[1] # 0.9741755
-
-merlot2019.quality <- select(merlot2019.resp,(8:10))
-res <- prcomp(merlot2019.quality, center = TRUE, scale = TRUE)
-merlot2019.quality.pc <- res$x[,1]
-var_explained = (res$sdev^2/(sum(res$sdev^2)))[1] # 0.78826
-
-merlot2019.pruning <- select(merlot2019.resp,(11:12))
-res <- prcomp(merlot2019.pruning, center = TRUE, scale = TRUE)
-merlot2019.pruning.pc <- res$x[,1]
-var_explained = (res$sdev^2/(sum(res$sdev^2)))[1] # 0.803176
-
-# 2020
-merlot2020.growth <- select(merlot2020.resp,c(1:4,13))
-res <- prcomp(merlot2020.growth, center = TRUE, scale = TRUE)
-merlot2020.growth.pc <- res$x[,1]
-var_explained = (res$sdev^2/(sum(res$sdev^2)))[1] # 0.7180542
-
-merlot2020.yield <- select(merlot2020.resp,(5:9))
-res <- prcomp(merlot2020.yield, center = TRUE, scale = TRUE)
-merlot2020.yield.pc <- res$x[,1]
-var_explained = (res$sdev^2/(sum(res$sdev^2)))[1] # 0.9821489
-
-merlot2020.quality <- select(merlot2020.resp,(10:12))
-res <- prcomp(merlot2020.quality, center = TRUE, scale = TRUE)
-merlot2020.quality.pc <- res$x[,1]
-var_explained = (res$sdev^2/(sum(res$sdev^2)))[1] # 0.8134009
-```
-
-
-```{r, include=FALSE}
-# putting together extracted datasets
-merlot2019.pca = cbind(merlot2019[-61:-65, 1:5], merlot2019.growth.pc, merlot2019.yield.pc,
-                            merlot2019.quality.pc, merlot2019.pruning.pc)
-merlot2019.pca = data.frame(merlot2019.pca)
-
-merlot2020.pca = cbind(merlot2020[-61:-65, 1:5], merlot2020.growth.pc, merlot2020.yield.pc,
-                            merlot2020.quality.pc)
-merlot2020.pca = data.frame(merlot2020.pca)
-```
-
-```{r, include=FALSE}
-# Now proceed with analysis using the following data sets
-chardonnay2019
-chardonnay2020
-merlot2019.pca
-merlot2020.pca
+merlot2020.resp <- select(merlot2020,(-1:-5))
 ```
 
 # Check for correlations
@@ -349,12 +118,6 @@ Yield is found to be positively correlated with number of clusters.
 merlot2019.resp %>% 
   cor() %>% 
   corrplot(type = "upper", order = "hclust", tl.col = "black", tl.srt = 45, addCoef.col="white", number.cex=0.7)
-  
-## correlation matrix after PCA
-merlot2019.pca %>% 
-  select(-1:-5) %>% 
-  cor() %>% 
-  corrplot(type = "upper", order = "hclust", tl.col = "black", tl.srt = 45, addCoef.col="white", number.cex=0.7)
 ```
 
 ### merlot 2020
@@ -364,14 +127,121 @@ merlot2019.pca %>%
 merlot2020.resp %>% 
   cor() %>% 
   corrplot(type = "upper", order = "hclust", tl.col = "black", tl.srt = 45, addCoef.col="white", number.cex=0.7)
-
-## correlation matrix after PCA
-merlot2020.pca %>% 
-  select(-1:-5) %>% 
-  cor() %>% 
-  corrplot(type = "upper", order = "hclust", tl.col = "black", tl.srt = 45, addCoef.col="white", number.cex=0.7)
 ```
 From the correlation matrix plots, there seem to be no obvious correlations among the response variables in these four datasets. We are good to continue with normality and equal variance assumptions check.
+
+# Handling missing data
+
+As mentioned above, missing data was unique to the Merlot datasets.
+
+## Veraison
+
+We know from the client that the veraison column indicates the number days into August in each respective year when 50% of the berries on a given vine had changed to red. If the corresponding cluster number is greater than zero, then the missing entries are a result of the vines reaching 50% veraison on the first day of measurement. They are missing not at random (MNAR) as whether this value is missing for each vine is dependent on this particular value. More specifically, if any of the missing values were recorded, it must be negative. If the corresponding cluster number is zero, then the missing entries are missing completely at random (MCAR) as there were no clusters to measure.
+
+This will be handled using survival analysis.
+
+Percentage of missing for the veraison measure of merlot2019 and merlot2020 are shown in Table \ref{missing.percent}.
+
+```{r missing.percent, echo=FALSE}
+kable(data.frame("Missing 2019"=paste0(round(mean(is.na(merlot2019$veraison)), 3)*100, "%"), 
+                 "Missing 2020"=paste0(round(mean(is.na(merlot2020$veraison)), 3)*100), "%"),
+      caption="\\label{missing.percent} Percentage of Veraison data that is missing in the 2019 and 2020 Merlot datasets.")
+```
+
+## Bloom
+
+Similar to veraison, the bloom column includes values that indicate the number of days into June in each respective year when 50% of the flowers on a given vine had started to bloom. The missing entries are a result of the vines reaching 50% bloom on the first day of measurement. They are also missing not at random (MNAR). Since there is no information on whether each vine has flowers, we make the assumption that there are for the time being.
+
+This will also be handled using survival analysis.
+
+`r paste0(round(mean(is.na(merlot2020$bloom)), 3)*100, "%")` of the bloom data in the Merlot 2020 dataset is missing.
+
+## Yield related measures
+
+For all columns that contain missing values (yield, cluster weight, berries/cluster, berry weight), the reason for missing is that the vine had no yield. Assigning these missing entries the value of zero seems plausible.
+
+`r paste0(round(mean(is.na(merlot2020$yield)), 3)*100, "%")` of the yield is missing in the Merlot 2020.
+
+
+## Berry related measures
+
+Similarly, for all columns that contain missing values (berry Brix, berry TA, berry pH, brown seed color), the reason for missing is that the vine had no yield. These values are missing simply because there were no grapes produced to have these measurements recorded. They are missing completely at random (MCAR). 
+
+Due to the structure of the study, particularly the existence of blocking and replication, imputation seems to be the most reasonable approach to fill in the missing values.
+
+`r paste0(round(mean(is.na(merlot2020$berry.Brix)), 3)*100, "%")` of the bloom data in the Merlot 2020 dataset is missing.
+
+## Question
+
+In the merlot2020 data set, most of the vines that had no entries for bloom or veraison (implying earlier ripening) also had no yield. This is against my intuition. If anything, as observed in the other three data sets, early ripening may be associated with higher yield? What was the weather event that caused some of the vines to have no yield?
+
+# Constructing complete data sets
+
+We construct complete data sets using the approaches described above. Once these complete data sets are constructed, analysis can be done separately on each of the imputed data sets. Although we need to look into the necessity and methods to aggregate these results. We should also look into the order or columns to impute, as well as whether all responses should be used to predict the missing values.
+
+For now, I have imputed using the yield related measures. We may consider more variants such as using only responses that are highly correlated.
+
+Linear regerssions are used for imputation. There are a lot more available options specified on page 76 of https://cran.r-project.org/web/packages/mice/mice.pdf.
+
+Note that the the columns of key, row and subsample are excluded from all imputations below.
+
+## merlot2019
+
+Since we are treating the missing veraison values using survival analysis later. There is no need to perform any imputation on this dataset.
+
+## merlot2020
+
+```{r, include=FALSE}
+# filling in zero for yield related entries
+merlot2020$yield[is.na(merlot2020$yield)] = 0
+merlot2020$cluster.weight[is.na(merlot2020$cluster.weight)] = 0
+merlot2020$berries.cluster[is.na(merlot2020$berries.cluster)] = 0
+merlot2020$berry.weight[is.na(merlot2020$berry.weight)] = 0
+
+# imputation for merlot2020 using all responses (excluding key, row and subsample)
+predMatrix = matrix(rep(1,ncol(merlot2020)^2), ncol(merlot2020), ncol(merlot2020))
+diag(predMatrix) = 0
+predMatrix[,1] = 0
+predMatrix[,4] = 0
+predMatrix[,5] = 0
+merlot2020mice = mice(data = merlot2020, predictorMatrix = predMatrix, seed = 1, method = "norm.predict")
+```
+
+The first set of imputed values for merlot2020 using all responses are shown below.
+
+```{r, echo=FALSE}
+# checking imputed values
+merlot2020full_1 = complete(merlot2020mice, 1)
+
+print("berry Brix")
+print(merlot2020full_1$berry.Brix[is.na(merlot2020$berry.Brix)])
+
+print("berry pH")
+print(merlot2020full_1$berry.pH[is.na(merlot2020$berry.pH)])
+
+print("berry TA")
+print(merlot2020full_1$berry.TA[is.na(merlot2020$berry.TA)])
+
+print("brown seed color")
+print(merlot2020full_1$brown.seed.color[is.na(merlot2020$brown.seed.color)])
+```
+
+Check out the imputed data sets in the code blocks!
+
+```{r, include=FALSE}
+chardonnay2019 # comlpete
+chardonnay2020 # complete
+merlot2019 # this is now complete excluding veraison
+merlot2020<-complete(merlot2020mice, 1) # first (out of 5) imputed data set for merlot2020 using all responses including the filled-in zeros
+```
+
+```{r, include=FALSE}
+# carry forward with the following data sets (response variables only)
+char2019.resp <- select(chardonnay2019,(-1:-5))
+char2020.resp <- select(chardonnay2020, (-1:-5))
+merlot2019.resp <- select(merlot2019,(-1:-5))
+merlot2020.resp <- select(merlot2020,(-1:-5))
+```
 
 ## Check for assumption of ANOVA test: normality and equal variance
 ### Chardonnay 2019 
