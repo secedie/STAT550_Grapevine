@@ -2,10 +2,10 @@
 title: "Grapevine"
 author: "Naitong Chen, Shirley Cui, Shannon Edie"
 output:
-  word_document: default
-  pdf_document: default
   html_document:
     df_print: paged
+  pdf_document: default
+  word_document: default
 editor_options:
   chunk_output_type: console
 ---
@@ -66,7 +66,6 @@ merlot2020$subsample = as.factor(merlot2020$subsample)
 
 ```
 
-
 ```{r var.descr.table, echo=FALSE}
 
 var.descr <- read.csv("Variable_descriptions.csv")
@@ -97,7 +96,7 @@ merlot2020.resp <- select(merlot2020,(-1:-5))
 chardonnay2019 %>% 
   select(-1:-5) %>% 
   cor() %>% 
-  corrplot(type = "upper", order = "hclust", tl.col = "black", tl.srt = 45, addCoef.col="white", number.cex=0.7, )
+  corrplot(type = "upper", order = "hclust", tl.col = "black", tl.srt = 45, addCoef.col="white", number.cex=0.7)
 ```
 From the output of correlation function, there seem no correlations between response variables.
 
@@ -115,17 +114,17 @@ Yield is found to be positively correlated with number of clusters.
 
 ```{r}
 ## correlation matrix before PCA
-merlot2019.resp %>% 
-  cor() %>% 
+merlot2019.resp %>%
+  cor() %>%
   corrplot(type = "upper", order = "hclust", tl.col = "black", tl.srt = 45, addCoef.col="white", number.cex=0.7)
 ```
 
 ### merlot 2020
 
 ```{r}
-## correlation matrix before PCA
-merlot2020.resp %>% 
-  cor() %>% 
+# correlation matrix before PCA
+merlot2020.resp %>%
+  cor() %>%
   corrplot(type = "upper", order = "hclust", tl.col = "black", tl.srt = 45, addCoef.col="white", number.cex=0.7)
 ```
 From the correlation matrix plots, there seem to be no obvious correlations among the response variables in these four datasets. We are good to continue with normality and equal variance assumptions check.
@@ -192,6 +191,7 @@ Since we are treating the missing veraison values using survival analysis later.
 ## merlot2020
 
 ```{r, include=FALSE}
+library(mice)
 # filling in zero for yield related entries
 merlot2020$yield[is.na(merlot2020$yield)] = 0
 merlot2020$cluster.weight[is.na(merlot2020$cluster.weight)] = 0
@@ -271,9 +271,6 @@ plot_resp = function(data, resp){
 
 plot_list1= lapply(colnames(char2019.resp), plot_resp, data = chardonnay2019)
 ggarrange(plotlist = plot_list1)
-
-
-
 
 ```
 
@@ -363,17 +360,17 @@ chardonnay2020 %>%
 1. table of mean and variance under control and treatment for each response variable
 
 ```{r}
-mer19.tab<-merlot2019.pca %>% 
-  group_by(block, treatment) %>% 
-  summarise(var.growth=var(merlot2019.growth.pc),
-            mean.growth=mean(merlot2019.growth.pc),
-            var.yield=var(merlot2019.yield.pc),
-            mean.yield=mean(merlot2019.yield.pc),
-            var.quality=var(merlot2019.quality.pc),
-            mean.quality=mean(merlot2019.quality.pc),
-            var.yield=var(merlot2019.pruning.pc),
-            mean.yield=mean(merlot2019.pruning.pc))
-kable(mer19.tab, caption="\\label{mer19.summary.table} Summary statistics for outcome variables in the Chardonnay 2019 dataset.")
+# mer19.tab<-merlot2019 %>% 
+#   group_by(block, treatment) %>% 
+#   summarise(var.SPAD=var(merlot2019.growth.pc),
+#             mean.growth=mean(merlot2019.growth.pc),
+#             var.yield=var(merlot2019.yield.pc),
+#             mean.yield=mean(merlot2019.yield.pc),
+#             var.quality=var(merlot2019.quality.pc),
+#             mean.quality=mean(merlot2019.quality.pc),
+#             var.yield=var(merlot2019.pruning.pc),
+#             mean.yield=mean(merlot2019.pruning.pc))
+# kable(mer19.tab, caption="\\label{mer19.summary.table} Summary statistics for outcome variables in the Chardonnay 2019 dataset.")
 ```
 
 2. Visualization (side by side boxplots for each response variable)
@@ -386,45 +383,45 @@ ggarrange(plotlist = plot_list3)
 3. Visualization (side by side boxplots for each response variable - block)
 
 ```{r}
-ggplot(merlot2019.pca, aes(x=treatment, y = merlot2019.growth.pc, fill=treatment)) +
-  scale_fill_manual(values=c("lightblue2", "seashell2"))+
-  geom_boxplot()+
-  labs(title = "growth") +
-  ylab("growth")+
-  facet_wrap(~block) 
-
-ggplot(merlot2019.pca, aes(x=treatment, y = merlot2019.yield.pc, fill=treatment)) +
-  scale_fill_manual(values=c("lightblue2", "seashell2"))+
-  geom_boxplot()+
-  labs(title = "yield") +
-  facet_wrap(~block) 
-
-ggplot(merlot2019.pca, aes(x=treatment, y = merlot2019.quality.pc, fill=treatment)) +
-  scale_fill_manual(values=c("lightblue2", "seashell2"))+
-  geom_boxplot()+
-  labs(title = "quality") +
-  facet_wrap(~block) 
-
-ggplot(merlot2019.pca, aes(x=treatment, y = merlot2019.pruning.pc, fill=treatment)) +
-  scale_fill_manual(values=c("lightblue2", "seashell2"))+
-  geom_boxplot()+
-  labs(title = "pruning") +
-  facet_wrap(~block) 
+# ggplot(merlot2019.pca, aes(x=treatment, y = merlot2019.growth.pc, fill=treatment)) +
+#   scale_fill_manual(values=c("lightblue2", "seashell2"))+
+#   geom_boxplot()+
+#   labs(title = "growth") +
+#   ylab("growth")+
+#   facet_wrap(~block) 
+# 
+# ggplot(merlot2019.pca, aes(x=treatment, y = merlot2019.yield.pc, fill=treatment)) +
+#   scale_fill_manual(values=c("lightblue2", "seashell2"))+
+#   geom_boxplot()+
+#   labs(title = "yield") +
+#   facet_wrap(~block) 
+# 
+# ggplot(merlot2019.pca, aes(x=treatment, y = merlot2019.quality.pc, fill=treatment)) +
+#   scale_fill_manual(values=c("lightblue2", "seashell2"))+
+#   geom_boxplot()+
+#   labs(title = "quality") +
+#   facet_wrap(~block) 
+# 
+# ggplot(merlot2019.pca, aes(x=treatment, y = merlot2019.pruning.pc, fill=treatment)) +
+#   scale_fill_manual(values=c("lightblue2", "seashell2"))+
+#   geom_boxplot()+
+#   labs(title = "pruning") +
+#   facet_wrap(~block) 
 ```
 
 ### merlot 2020
 1. table of mean and variance under control and treatment for each response variable
 
 ```{r}
-mer20.tab<-merlot2020.pca %>% 
-  group_by(block, treatment) %>% 
-  summarise(var.growth=var(merlot2020.growth.pc),
-            mean.growth=mean(merlot2020.growth.pc),
-            var.yield=var(merlot2020.yield.pc),
-            mean.yield=mean(merlot2020.yield.pc),
-            var.quality=var(merlot2020.quality.pc),
-            mean.quality=mean(merlot2020.quality.pc))
-kable(mer20.tab, caption="\\label{char19.summary.table} Summary statistics for outcome variables in the Chardonnay 2019 dataset.")
+# mer20.tab<-merlot2020.pca %>% 
+#   group_by(block, treatment) %>% 
+#   summarise(var.growth=var(merlot2020.growth.pc),
+#             mean.growth=mean(merlot2020.growth.pc),
+#             var.yield=var(merlot2020.yield.pc),
+#             mean.yield=mean(merlot2020.yield.pc),
+#             var.quality=var(merlot2020.quality.pc),
+#             mean.quality=mean(merlot2020.quality.pc))
+# kable(mer20.tab, caption="\\label{char19.summary.table} Summary statistics for outcome variables in the Chardonnay 2019 dataset.")
 ```
 
 2. Visualization (side by side boxplots for each response variable)
@@ -438,145 +435,146 @@ ggarrange(plotlist = plot_list4, heights = 2)
 3. Visualization (side by side boxplots for each response variable - block)
 
 ```{r}
-ggplot(merlot2020.pca, aes(x=treatment, y = merlot2020.growth.pc, fill=treatment)) +
-  scale_fill_manual(values=c("lightblue2", "seashell2"))+
-  geom_boxplot()+
-  labs(title = "growth") +
-  ylab("growth")+
-  facet_wrap(~block) 
-
-ggplot(merlot2020.pca, aes(x=treatment, y = merlot2020.yield.pc, fill=treatment)) +
-  scale_fill_manual(values=c("lightblue2", "seashell2"))+
-  geom_boxplot()+
-  labs(title = "yield") +
-  facet_wrap(~block) 
-
-ggplot(merlot2020.pca, aes(x=treatment, y = merlot2020.quality.pc, fill=treatment)) +
-  scale_fill_manual(values=c("lightblue2", "seashell2"))+
-  geom_boxplot()+
-  labs(title = "quality") +
-  facet_wrap(~block) 
+# ggplot(merlot2020.pca, aes(x=treatment, y = merlot2020.growth.pc, fill=treatment)) +
+#   scale_fill_manual(values=c("lightblue2", "seashell2"))+
+#   geom_boxplot()+
+#   labs(title = "growth") +
+#   ylab("growth")+
+#   facet_wrap(~block) 
+# 
+# ggplot(merlot2020.pca, aes(x=treatment, y = merlot2020.yield.pc, fill=treatment)) +
+#   scale_fill_manual(values=c("lightblue2", "seashell2"))+
+#   geom_boxplot()+
+#   labs(title = "yield") +
+#   facet_wrap(~block) 
+# 
+# ggplot(merlot2020.pca, aes(x=treatment, y = merlot2020.quality.pc, fill=treatment)) +
+#   scale_fill_manual(values=c("lightblue2", "seashell2"))+
+#   geom_boxplot()+
+#   labs(title = "quality") +
+#   facet_wrap(~block) 
 ```
 
 Based on the side-by-side box plots above, it seems that many outcome variables do not have equal variance, or the distribution is not quite normal. One limitation which can explain this is that our sample size is really small for each treatment in each block(5 or 6 data points). Hence, the plot cannot really tell much useful information about the data. 
 
 Below, wilcoxon rank tests can be performed to test whether the distribution in control and treatment groups are the same. (that would be a lot of tests... I only tried out the test for number of clusters in Char2019 for five blocks.)
+
 ### randomization test
 chardonnay 2019
 ```{r}
-for (i in unique(chardonnay2019$block)){
-  res=wilcox.test(chardonnay2019$X..of.clusters[chardonnay2019$block==i 
-                                                & chardonnay2019$treatment=="heat"],
-                  chardonnay2019$X..of.clusters[chardonnay2019$block==i 
-                                                & chardonnay2019$treatment=="control"],
-                  exact=FALSE)
-  print(res)
-}
+# for (i in unique(chardonnay2019$block)){
+#   res=wilcox.test(chardonnay2019$X..of.clusters[chardonnay2019$block==i 
+#                                                 & chardonnay2019$treatment=="heat"],
+#                   chardonnay2019$X..of.clusters[chardonnay2019$block==i 
+#                                                 & chardonnay2019$treatment=="control"],
+#                   exact=FALSE)
+#   print(res)
+# }
 ```
 
 QQ plot for number of clusters in chardonnary 2019 (for each block/treatment combo)
 
 ```{r, echo=FALSE}
-for (i in unique(chardonnay2019$block)){
-  qqnorm(chardonnay2019$X..of.clusters[chardonnay2019$block==i & chardonnay2019$treatment=="heat"])
-  qqline(chardonnay2019$X..of.clusters[chardonnay2019$block==i & chardonnay2019$treatment=="heat"], col = "red")
-  qqnorm(chardonnay2019$X..of.clusters[chardonnay2019$block==i & chardonnay2019$treatment=="control"])
-  qqline(chardonnay2019$X..of.clusters[chardonnay2019$block==i & chardonnay2019$treatment=="control"], col = "red")
-}
+# for (i in unique(chardonnay2019$block)){
+#   qqnorm(chardonnay2019$X..of.clusters[chardonnay2019$block==i & chardonnay2019$treatment=="heat"])
+#   qqline(chardonnay2019$X..of.clusters[chardonnay2019$block==i & chardonnay2019$treatment=="heat"], col = "red")
+#   qqnorm(chardonnay2019$X..of.clusters[chardonnay2019$block==i & chardonnay2019$treatment=="control"])
+#   qqline(chardonnay2019$X..of.clusters[chardonnay2019$block==i & chardonnay2019$treatment=="control"], col = "red")
+# }
 ```
 
 F test and randomization test for equal variance of number of cluster between treatments for each block in chardonnary 2019
 ```{r, echo=FALSE}
-for (i in unique(chardonnay2019$block)){
-  res = var.test(chardonnay2019$X..of.clusters[chardonnay2019$block==i 
-                                               & chardonnay2019$treatment=="heat"], 
-                 chardonnay2019$X..of.clusters[chardonnay2019$block==i 
-                                               & chardonnay2019$treatment=="control"])
-  print("F test")
-  print(res$p.value)
-  
-  # randomization test for equal variance
-  n = 2*length(chardonnay2019$X..of.clusters[chardonnay2019$block==i & chardonnay2019$treatment=="heat"])
-  n1 = length(chardonnay2019$X..of.clusters[chardonnay2019$block==i & chardonnay2019$treatment=="heat"])
-  totalComb <- combn(n, n1)
-  dim(totalComb)
-  
-  totalComb.complement <- matrix(nrow = dim(totalComb)[1], ncol = dim(totalComb)[2])
-  for (j in 1:dim(totalComb)[2]) {
-    totalComb.complement[,j] = (1:n)[-totalComb[,j]]
-  }
-  
-  # replace the indices by the actual value.
-  dat = chardonnay2019$X..of.clusters[chardonnay2019$block==i]
-  dat.mat <- matrix(dat[totalComb], ncol = choose(n, n1))
-  dat.mat.complement <- matrix(dat[totalComb.complement], ncol = choose(n, n1))
-  
-  # calculate the d_obs
-  d.obs <- abs(var(chardonnay2019$X..of.clusters[chardonnay2019$block==i & chardonnay2019$treatment=="heat"]) - var(chardonnay2019$X..of.clusters[chardonnay2019$block==i & chardonnay2019$treatment=="control"]))
-  
-  # calculate all other ds
-  abs.diff.var <- rep(0, dim(totalComb)[2])
-  for (j in 1:dim(totalComb)[2]) {
-    abs.diff.var[j] = abs(var(dat.mat[,j]) - var(dat.mat.complement[,j]))
-  }
-
-  c1 <- sum(abs.diff.var > d.obs)
-  c2 <- sum(abs.diff.var == d.obs)
-  p.val <- (c1 + 0.5*c2)/choose(n, n1)
-  print("rand test")
-  print(p.val)
-}
+# for (i in unique(chardonnay2019$block)){
+#   res = var.test(chardonnay2019$X..of.clusters[chardonnay2019$block==i 
+#                                                & chardonnay2019$treatment=="heat"], 
+#                  chardonnay2019$X..of.clusters[chardonnay2019$block==i 
+#                                                & chardonnay2019$treatment=="control"])
+#   print("F test")
+#   print(res$p.value)
+#   
+#   # randomization test for equal variance
+#   n = 2*length(chardonnay2019$X..of.clusters[chardonnay2019$block==i & chardonnay2019$treatment=="heat"])
+#   n1 = length(chardonnay2019$X..of.clusters[chardonnay2019$block==i & chardonnay2019$treatment=="heat"])
+#   totalComb <- combn(n, n1)
+#   dim(totalComb)
+#   
+#   totalComb.complement <- matrix(nrow = dim(totalComb)[1], ncol = dim(totalComb)[2])
+#   for (j in 1:dim(totalComb)[2]) {
+#     totalComb.complement[,j] = (1:n)[-totalComb[,j]]
+#   }
+#   
+#   # replace the indices by the actual value.
+#   dat = chardonnay2019$X..of.clusters[chardonnay2019$block==i]
+#   dat.mat <- matrix(dat[totalComb], ncol = choose(n, n1))
+#   dat.mat.complement <- matrix(dat[totalComb.complement], ncol = choose(n, n1))
+#   
+#   # calculate the d_obs
+#   d.obs <- abs(var(chardonnay2019$X..of.clusters[chardonnay2019$block==i & chardonnay2019$treatment=="heat"]) - var(chardonnay2019$X..of.clusters[chardonnay2019$block==i & chardonnay2019$treatment=="control"]))
+#   
+#   # calculate all other ds
+#   abs.diff.var <- rep(0, dim(totalComb)[2])
+#   for (j in 1:dim(totalComb)[2]) {
+#     abs.diff.var[j] = abs(var(dat.mat[,j]) - var(dat.mat.complement[,j]))
+#   }
+# 
+#   c1 <- sum(abs.diff.var > d.obs)
+#   c2 <- sum(abs.diff.var == d.obs)
+#   p.val <- (c1 + 0.5*c2)/choose(n, n1)
+#   print("rand test")
+#   print(p.val)
+# }
 ```
 
 QQ plot for the growth PC in merlot 2020 (for each block/treatment combo)
 
 ```{r, echo=FALSE}
-for (i in unique(merlot2020.pca$block)){
-  qqnorm(merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i & merlot2020.pca$treatment=="heat"])
-  qqline(merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i & merlot2020.pca$treatment=="heat"], col = "red")
-  qqnorm(merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i & merlot2020.pca$treatment=="control"])
-  qqline(merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i & merlot2020.pca$treatment=="control"], col = "red")
-}
+# for (i in unique(merlot2020.pca$block)){
+#   qqnorm(merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i & merlot2020.pca$treatment=="heat"])
+#   qqline(merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i & merlot2020.pca$treatment=="heat"], col = "red")
+#   qqnorm(merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i & merlot2020.pca$treatment=="control"])
+#   qqline(merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i & merlot2020.pca$treatment=="control"], col = "red")
+# }
 ```
 
 F test and randomization test for equal variance between treatments for each block in merlot 2020
 ```{r, echo=FALSE}
-for (i in unique(merlot2020.pca$block)){
-  res = var.test(merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i & merlot2020.pca$treatment=="heat"], merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i & merlot2020.pca$treatment=="control"])
-  print("F test")
-  print(res$p.value)
-  
-  # randomization test for equal variance
-  n = 2*length(merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i & merlot2020.pca$treatment=="heat"])
-  n1 = length(merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i & merlot2020.pca$treatment=="heat"])
-  totalComb <- combn(n, n1)
-  dim(totalComb)
-  
-  totalComb.complement <- matrix(nrow = dim(totalComb)[1], ncol = dim(totalComb)[2])
-  for (j in 1:dim(totalComb)[2]) {
-    totalComb.complement[,j] = (1:n)[-totalComb[,j]]
-  }
-  
-  # replace the indices by the actual value.
-  dat = merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i]
-  dat.mat <- matrix(dat[totalComb], ncol = choose(n, n1))
-  dat.mat.complement <- matrix(dat[totalComb.complement], ncol = choose(n, n1))
-  
-  # calculate the d_obs
-  d.obs <- abs(var(merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i & merlot2020.pca$treatment=="heat"]) - var(merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i & merlot2020.pca$treatment=="control"]))
-  
-  # calculate all other ds
-  abs.diff.var <- rep(0, dim(totalComb)[2])
-  for (j in 1:dim(totalComb)[2]) {
-    abs.diff.var[j] = abs(var(dat.mat[,j]) - var(dat.mat.complement[,j]))
-  }
-
-  c1 <- sum(abs.diff.var > d.obs)
-  c2 <- sum(abs.diff.var == d.obs)
-  p.val <- (c1 + 0.5*c2)/choose(n, n1)
-  print("rand test")
-  print(p.val)
-}
+# for (i in unique(merlot2020.pca$block)){
+#   res = var.test(merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i & merlot2020.pca$treatment=="heat"], merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i & merlot2020.pca$treatment=="control"])
+#   print("F test")
+#   print(res$p.value)
+#   
+#   # randomization test for equal variance
+#   n = 2*length(merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i & merlot2020.pca$treatment=="heat"])
+#   n1 = length(merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i & merlot2020.pca$treatment=="heat"])
+#   totalComb <- combn(n, n1)
+#   dim(totalComb)
+#   
+#   totalComb.complement <- matrix(nrow = dim(totalComb)[1], ncol = dim(totalComb)[2])
+#   for (j in 1:dim(totalComb)[2]) {
+#     totalComb.complement[,j] = (1:n)[-totalComb[,j]]
+#   }
+#   
+#   # replace the indices by the actual value.
+#   dat = merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i]
+#   dat.mat <- matrix(dat[totalComb], ncol = choose(n, n1))
+#   dat.mat.complement <- matrix(dat[totalComb.complement], ncol = choose(n, n1))
+#   
+#   # calculate the d_obs
+#   d.obs <- abs(var(merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i & merlot2020.pca$treatment=="heat"]) - var(merlot2020.pca$merlot2020.growth.pc[merlot2020.pca$block==i & merlot2020.pca$treatment=="control"]))
+#   
+#   # calculate all other ds
+#   abs.diff.var <- rep(0, dim(totalComb)[2])
+#   for (j in 1:dim(totalComb)[2]) {
+#     abs.diff.var[j] = abs(var(dat.mat[,j]) - var(dat.mat.complement[,j]))
+#   }
+# 
+#   c1 <- sum(abs.diff.var > d.obs)
+#   c2 <- sum(abs.diff.var == d.obs)
+#   p.val <- (c1 + 0.5*c2)/choose(n, n1)
+#   print("rand test")
+#   print(p.val)
+# }
 ```
 
 We see that the normality assumptions are slightly violated, and the equal variance assumptions are also violated even though we only compared variances between treatments within each block. Therefore we will use both a parametric and a non parametric test in the following analysis. (Should repeat the above for all other variables.)
@@ -586,36 +584,36 @@ We see that the normality assumptions are slightly violated, and the equal varia
 
 ```{r char.univ, fig.cap="\\label{year.char.boxplot} Boxplots of the overall distributions of factors looked at for Chardonnay, divided by year. These plots give us an idea of if there are any glaring outliers."}
 
-# Let's check distributions of variables
-resp.char <- c("X..of.clusters", "yield..kg.", "av.cluster.weight..kg.")
-labels.char <- c("Number of clusters", "Yield (kg)", "Average cluster weight (kg)")
-par(mfrow=c(2,2), mar=c(1,2,2,1))
-for (i in 1:length(resp.char)) {
-  boxplot(chardonnay2019[,which(names(chardonnay2019)==resp.char[i])], 
-          chardonnay2020[,which(names(chardonnay2020)==resp.char[i])], cex.main=1, main=labels.char[i],
-          xlab="Year")
-}
+# # Let's check distributions of variables
+# resp.char <- c("X..of.clusters", "yield..kg.", "av.cluster.weight..kg.")
+# labels.char <- c("Number of clusters", "Yield (kg)", "Average cluster weight (kg)")
+# par(mfrow=c(2,2), mar=c(1,2,2,1))
+# for (i in 1:length(resp.char)) {
+#   boxplot(chardonnay2019[,which(names(chardonnay2019)==resp.char[i])], 
+#           chardonnay2020[,which(names(chardonnay2020)==resp.char[i])], cex.main=1, main=labels.char[i],
+#           xlab="Year")
+# }
 
 ```
 
 ```{r mer2019.univ}
 
-# Define the features we want to consider for merlot
-resp.mer <- unique(c(colnames(merlot2019)[-c(1:5, 7)], colnames(merlot2020)[-c(1:5, 7:8)]))
-
-# Strictly univariate: check for outliers
-par(mfrow=c(4,4), mar=c(1,2,2,1))
-for (i in 1:length(resp.mer)) {
-  if (resp.mer[i] %in% c("pruning.weight", "Ravaz.index")) {
-  boxplot(merlot2019[,which(names(merlot2019)==resp.mer[i])], cex.main=0.9, main=resp.mer[i])
-  } else if (resp.mer[i] %in% c("fruitfulness", "brown.seed.color")) {
-  boxplot(merlot2020[,which(names(merlot2020)==resp.mer[i])], cex.main=0.9, main=resp.mer[i])
-  } else {
-  boxplot(merlot2019[,which(names(merlot2019)==resp.mer[i])], 
-          merlot2020[,which(names(merlot2020)==resp.mer[i])], cex.main=0.9, main=resp.mer[i],
-          xlab="Year")
-  }
-}
+# # Define the features we want to consider for merlot
+# resp.mer <- unique(c(colnames(merlot2019)[-c(1:5, 7)], colnames(merlot2020)[-c(1:5, 7:8)]))
+# 
+# # Strictly univariate: check for outliers
+# par(mfrow=c(4,4), mar=c(1,2,2,1))
+# for (i in 1:length(resp.mer)) {
+#   if (resp.mer[i] %in% c("pruning.weight", "Ravaz.index")) {
+#   boxplot(merlot2019[,which(names(merlot2019)==resp.mer[i])], cex.main=0.9, main=resp.mer[i])
+#   } else if (resp.mer[i] %in% c("fruitfulness", "brown.seed.color")) {
+#   boxplot(merlot2020[,which(names(merlot2020)==resp.mer[i])], cex.main=0.9, main=resp.mer[i])
+#   } else {
+#   boxplot(merlot2019[,which(names(merlot2019)==resp.mer[i])], 
+#           merlot2020[,which(names(merlot2020)==resp.mer[i])], cex.main=0.9, main=resp.mer[i],
+#           xlab="Year")
+#   }
+# }
 
 ```
 
@@ -649,12 +647,12 @@ dimnames(homosc.table.mer20)[[1]] <- resp.mer20
 
 # Compare variances for each unique treatment-block group
 for (i in 1:length(resp.mer19)) {
-  
+
   # the lapply function simply extracts the p-value from each outputted run of the MICE data
-  bart.p <- unlist(lapply(with(merlot2019mice, 
-                               bartlett.test(eval(parse(text=resp.mer19[i])) ~ paste(treatment, block)))$analyses, 
+  bart.p <- unlist(lapply(with(merlot2019,
+                               bartlett.test(eval(parse(text=resp.mer19[i])) ~ paste(treatment, block)))$analyses,
                           FUN=function(x){x$p.value}))
-  lev.p  <- unlist(lapply(with(merlot2019mice, 
+  lev.p  <- unlist(lapply(with(merlot2019,
                         levene.test(eval(parse(text=resp.mer19[i])), paste(treatment, block)))$analyses,
                           FUN=function(x){x$p.value}))
   homosc.table.mer19[i,1,] <- bart.p
@@ -669,10 +667,9 @@ uneq.var.mer19 <- apply(homosc.table.mer19, c(1,2), function(x){sum(x<0.05)})
 # unequal variances
 par(mfrow=c(sum(rowSums(uneq.var.mer19)>0),1))
 lapply(rownames(uneq.var.mer19)[rowSums(uneq.var.mer19)>0], function(x){
-  with(merlot2019mice, 
+  with(merlot2019,
        boxplot(cluster.weight ~ paste0(block, treatment))
        )[[1]]})
-
 ```
 
 ```{r fig.cap="Distributions of variables for which equal variance assumptions were violated for at least one of the subgroups being analyzed."}
@@ -1050,6 +1047,7 @@ dat = chardonnay2019
 model = art(X..of.clusters ~ treatment + block + treatment:block, data = dat)
 res = anova(model, type = 1)
 print(res)
+print(res$`Pr(>F)`)
 
 ### ANOVA 
 summary(aov(X..of.clusters ~ treatment + block + treatment:block, data = dat))
@@ -1064,6 +1062,7 @@ dat = chardonnay2019
 model = art(yield..kg. ~ treatment + block + treatment:block, data = dat)
 res = anova(model, type = 1)
 print(res)
+print(res$`Pr(>F)`)
 
 ### ANOVA
 summary(aov(yield..kg. ~ treatment + block + treatment:block, data = dat))
@@ -1076,6 +1075,7 @@ dat = chardonnay2019
 model = art(av.cluster.weight..kg. ~ treatment + block + treatment:block, data = dat)
 res = anova(model, type = 1)
 print(res)
+print(res$`Pr(>F)`)
 
 ### ANOVA
 summary(aov(av.cluster.weight..kg. ~ treatment + block + treatment:block, data = dat))
@@ -1088,6 +1088,7 @@ dat = chardonnay2020
 model = art(X..of.clusters ~ treatment + block + treatment:block, data = dat)
 res = anova(model, type = 1)
 print(res)
+print(res$`Pr(>F)`)
 
 ### ANOVA
 summary(aov(X..of.clusters ~ treatment + block + treatment:block, data = dat))
@@ -1102,6 +1103,7 @@ dat = chardonnay2020
 model = art(yield..kg. ~ treatment + block + treatment:block, data = dat)
 res = anova(model, type = 1)
 print(res)
+print(res$`Pr(>F)`)
 
 ### ANOVA
 summary(aov(yield..kg. ~ treatment + block + treatment:block, data = dat))
@@ -1116,133 +1118,301 @@ dat = chardonnay2020
 model = art(av.cluster.weight..kg. ~ treatment + block + treatment:block, data = dat)
 res = anova(model, type = 1)
 print(res)
+print(res$`Pr(>F)`)
 
 ### ANOVA
 summary(aov(av.cluster.weight..kg. ~ treatment + block + treatment:block, data = dat))
 ```
 
-### Merlot 2019 growth PC
+### Merlot 2019 SPAD
 ```{r, echo=FALSE}
 library(ARTool)
-dat = merlot2019.pca
-model = art(merlot2019.growth.pc ~ treatment + block + treatment:block, data = dat)
+dat = merlot2019
+model = art(SPAD ~ treatment + block + treatment:block, data = dat)
+res = anova(model, type = 1)
+print(res)
+print(res$`Pr(>F)`)
+
+### ANOVA
+summary(aov(SPAD ~ treatment + block + treatment:block, data = dat))
+```
+
+Again, block was found significant to the SPAD of grape in both test.
+
+### Merlot 2019 cluster number
+```{r, echo=FALSE}
+library(ARTool)
+dat = merlot2019
+model = art(cluster.number ~ treatment + block + treatment:block, data = dat)
 res = anova(model, type = 1)
 print(res)
 
 ### ANOVA
-summary(aov(merlot2019.growth.pc ~ treatment + block + treatment:block, data = dat))
+summary(aov(cluster.number ~ treatment + block + treatment:block, data = dat))
 ```
 
-Again, block was found significant to the growth of grape (specifically what?) in both test. Treatment was also found significant in ANOVA, but ANOVA assumption does not hold, the result may not be reliable.
-
-### Merlot 2019 yield PC
+### Merlot 2019 yield
 ```{r, echo=FALSE}
 library(ARTool)
-dat = merlot2019.pca
-model = art(merlot2019.yield.pc ~ treatment + block + treatment:block, data = dat)
+dat = merlot2019
+model = art(yield ~ treatment + block + treatment:block, data = dat)
 res = anova(model, type = 1)
 print(res)
 
 ### ANOVA
-summary(aov(merlot2019.yield.pc ~ treatment + block + treatment:block, data = dat))
+summary(aov(yield ~ treatment + block + treatment:block, data = dat))
 ```
 
-Block was again found significantly influential to yield
+Blocking is significant.
 
-### Merlot 2019 quality PC
+### Merlot 2019 cluster weight
 ```{r, echo=FALSE}
 library(ARTool)
-dat = merlot2019.pca
-model = art(merlot2019.quality.pc ~ treatment + block + treatment:block, data = dat)
+dat = merlot2019
+model = art(cluster.weight ~ treatment + block + treatment:block, data = dat)
 res = anova(model, type = 1)
 print(res)
 
 ### ANOVA
-summary(aov(merlot2019.quality.pc ~ treatment + block + treatment:block, data = dat))
+summary(aov(cluster.weight ~ treatment + block + treatment:block, data = dat))
 ```
 
-### Merlot 2019 pruning PC
+Blocking is significant, interaction is significant in ART but not in ANOVA (unreliable result?).
+
+### Merlot 2019 berries cluster
 ```{r, echo=FALSE}
 library(ARTool)
-dat = merlot2019.pca
-model = art(merlot2019.pruning.pc ~ treatment + block + treatment:block, data = dat)
+dat = merlot2019
+model = art(berries.cluster ~ treatment + block + treatment:block, data = dat)
 res = anova(model, type = 1)
 print(res)
 
 ### ANOVA
-summary(aov(merlot2019.pruning.pc ~ treatment + block + treatment:block, data = dat))
+summary(aov(berries.cluster ~ treatment + block + treatment:block, data = dat))
 ```
 
-Interaction was found significant in pruning (pruning weight, Ravaz index)
+Blocking and interaction are significant. Treatment is on the boundary.
 
-### Merlot 2020 growth PC
+### Merlot 2019 berry weight
 ```{r, echo=FALSE}
 library(ARTool)
-dat = merlot2020.pca
-model = art(merlot2020.growth.pc ~ treatment + block + treatment:block, data = dat)
+dat = merlot2019
+model = art(berry.weight ~ treatment + block + treatment:block, data = dat)
 res = anova(model, type = 1)
 print(res)
 
 ### ANOVA
-summary(aov(merlot2020.growth.pc ~ treatment + block + treatment:block, data = dat))
+summary(aov(berry.weight ~ treatment + block + treatment:block, data = dat))
 ```
 
-treatment and interaction were found significantly related to the growth. Maybe a particular geographical area combined with the heating technique effect are beneficial for the growth of grapes. We may also conduct **multiple comparison**.
+Blocking and interaction are significant.
 
-### Merlot 2020 yield PC
+### Merlot 2019 berry TA
 ```{r, echo=FALSE}
 library(ARTool)
-dat = merlot2020.pca
-model = art(merlot2020.yield.pc ~ treatment + block + treatment:block, data = dat)
+dat = merlot2019
+model = art(berry.TA ~ treatment + block + treatment:block, data = dat)
 res = anova(model, type = 1)
 print(res)
 
 ### ANOVA
-summary(aov(merlot2020.yield.pc ~ treatment + block + treatment:block, data = dat))
+summary(aov(berry.TA ~ treatment + block + treatment:block, data = dat))
 ```
 
-### Merlot 2020 quality PC
+Blocking is significant.
+
+### Merlot 2019 berry pH
 ```{r, echo=FALSE}
 library(ARTool)
-dat = merlot2020.pca
-model = art(merlot2020.quality.pc ~ treatment + block + treatment:block, data = dat)
+dat = merlot2019
+model = art(berry.pH ~ treatment + block + treatment:block, data = dat)
 res = anova(model, type = 1)
 print(res)
 
 ### ANOVA
-summary(aov(merlot2020.quality.pc ~ treatment + block + treatment:block, data = dat))
+summary(aov(berry.pH ~ treatment + block + treatment:block, data = dat))
 ```
-### Merlot individual factors
 
-```{r}
+All are significant except for treatment in ANOVA (unreliable?)
 
+### Merlot 2019 berry Brix
+```{r, echo=FALSE}
 library(ARTool)
+dat = merlot2019
+model = art(berry.Brix ~ treatment + block + treatment:block, data = dat)
+res = anova(model, type = 1)
+print(res)
 
-art.model.mer20 <- vector("list", length(resp.mer20))
-anova.mer20 <- vector("list", length(resp.mer20))
-names(anova.mer20) <- resp.mer20
-names(art.model.mer20) <- resp.mer20
-
-for (i in 1:length(resp.mer20)) {
-  art.model.mer20[[i]] = art(eval(parse(text=resp.mer20[i])) ~ treatment + block + treatment:block,
-                             data=complete(merlot2020mice, 1))
-  anova.mer20[[i]] = anova(art.model.mer20[[i]], type = 1)
-}
-
-anova.mer20 <- lapply(anova.mer20, function(x){as.data.frame(x[,-1])})
-anova.mer20 <- lapply(1:length(anova.mer20), 
-                      function(x){cbind(anova.mer20[[x]], 
-                                        data.frame("Var"=rep(names(anova.mer20)[x],3),
-                                                   "Covar"=rownames(anova.mer20[[x]])))})
-
-anova.mer20 <- do.call(rbind.data.frame, anova.mer20)
-
-library(maditr)
-dcast(anova.mer20, Var~Covar, value.var="Pr(>F)")
-
+### ANOVA
+summary(aov(berry.Brix ~ treatment + block + treatment:block, data = dat))
 ```
 
-Only one treatment effect was found significant (growth in merlot 2020). Although some of the interaction effects are. Maybe heating only helps under certain geographical conditions? 
+### Merlot 2019 pruning weight
+```{r, echo=FALSE}
+library(ARTool)
+dat = merlot2019
+model = art(pruning.weight ~ treatment + block + treatment:block, data = dat)
+res = anova(model, type = 1)
+print(res)
+
+### ANOVA
+summary(aov(pruning.weight ~ treatment + block + treatment:block, data = dat))
+```
+
+Blocking and interaction are significant.
+
+### Merlot 2019 Ravaz index
+```{r, echo=FALSE}
+library(ARTool)
+dat = merlot2019
+model = art(Ravaz.index ~ treatment + block + treatment:block, data = dat)
+res = anova(model, type = 1)
+print(res)
+
+### ANOVA
+summary(aov(Ravaz.index ~ treatment + block + treatment:block, data = dat))
+```
+
+Interaction is significant.
+
+### Merlot 2020 SPAD
+```{r, echo=FALSE}
+library(ARTool)
+dat = merlot2020
+model = art(SPAD ~ treatment + block + treatment:block, data = dat)
+res = anova(model, type = 1)
+print(res)
+print(res$`Pr(>F)`)
+
+### ANOVA
+summary(aov(SPAD ~ treatment + block + treatment:block, data = dat))
+```
+
+Block was found significant to the SPAD of grape in both test, and treatment is on the boundary.
+
+### Merlot 2020 cluster number
+```{r, echo=FALSE}
+library(ARTool)
+dat = merlot2020
+model = art(cluster.number ~ treatment + block + treatment:block, data = dat)
+res = anova(model, type = 1)
+print(res)
+
+### ANOVA
+summary(aov(cluster.number ~ treatment + block + treatment:block, data = dat))
+```
+
+### Merlot 2020 yield
+```{r, echo=FALSE}
+library(ARTool)
+dat = merlot2020
+model = art(yield ~ treatment + block + treatment:block, data = dat)
+res = anova(model, type = 1)
+print(res)
+
+### ANOVA
+summary(aov(yield ~ treatment + block + treatment:block, data = dat))
+```
+
+### Merlot 2020 cluster weight
+```{r, echo=FALSE}
+library(ARTool)
+dat = merlot2020
+model = art(cluster.weight ~ treatment + block + treatment:block, data = dat)
+res = anova(model, type = 1)
+print(res)
+
+### ANOVA
+summary(aov(cluster.weight ~ treatment + block + treatment:block, data = dat))
+```
+
+### Merlot 2020 berries cluster
+```{r, echo=FALSE}
+library(ARTool)
+dat = merlot2020
+model = art(berries.cluster ~ treatment + block + treatment:block, data = dat)
+res = anova(model, type = 1)
+print(res)
+
+### ANOVA
+summary(aov(berries.cluster ~ treatment + block + treatment:block, data = dat))
+```
+
+### Merlot 2020 berry weight
+```{r, echo=FALSE}
+library(ARTool)
+dat = merlot2020
+model = art(berry.weight ~ treatment + block + treatment:block, data = dat)
+res = anova(model, type = 1)
+print(res)
+
+### ANOVA
+summary(aov(berry.weight ~ treatment + block + treatment:block, data = dat))
+```
+
+### Merlot 2020 berry TA
+```{r, echo=FALSE}
+library(ARTool)
+dat = merlot2020
+model = art(berry.TA ~ treatment + block + treatment:block, data = dat)
+res = anova(model, type = 1)
+print(res)
+
+### ANOVA
+summary(aov(berry.TA ~ treatment + block + treatment:block, data = dat))
+```
+
+### Merlot 2020 berry pH
+```{r, echo=FALSE}
+library(ARTool)
+dat = merlot2020
+model = art(berry.pH ~ treatment + block + treatment:block, data = dat)
+res = anova(model, type = 1)
+print(res)
+
+### ANOVA
+summary(aov(berry.pH ~ treatment + block + treatment:block, data = dat))
+```
+
+### Merlot 2020 berry Brix
+```{r, echo=FALSE}
+library(ARTool)
+dat = merlot2020
+model = art(berry.Brix ~ treatment + block + treatment:block, data = dat)
+res = anova(model, type = 1)
+print(res)
+
+### ANOVA
+summary(aov(berry.Brix ~ treatment + block + treatment:block, data = dat))
+```
+
+### Merlot 2020 fruitfulness
+```{r, echo=FALSE}
+library(ARTool)
+dat = merlot2020
+model = art(fruitfulness ~ treatment + block + treatment:block, data = dat)
+res = anova(model, type = 1)
+print(res)
+
+### ANOVA
+summary(aov(fruitfulness ~ treatment + block + treatment:block, data = dat))
+```
+
+### Merlot 2020 brown seed color
+```{r, echo=FALSE}
+library(ARTool)
+dat = merlot2020
+model = art(brown.seed.color ~ treatment + block + treatment:block, data = dat)
+res = anova(model, type = 1)
+print(res)
+
+### ANOVA
+summary(aov(brown.seed.color ~ treatment + block + treatment:block, data = dat))
+```
+
+Blocking is significant.
+
+Only few treatment effects were found significant (all in 2019). Although some of the interaction effects are. Maybe heating only helps under certain geographical conditions? 
 
 Another thing to check is the actual estimate of the treatment/blocking/interaction effects. We can also construct SEs of each of these effects. 
 
