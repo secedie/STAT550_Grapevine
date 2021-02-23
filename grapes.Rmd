@@ -89,7 +89,7 @@ merlot2019.resp <- select(merlot2019,(-1:-5))
 merlot2020.resp <- select(merlot2020,(-1:-5))
 ```
 
-# Check for correlations
+# Check for correlations among response variables
 ### chardonnay 2019
 
 ```{r}
@@ -115,19 +115,77 @@ Yield is found to be positively correlated with number of clusters.
 ```{r}
 ## correlation matrix before PCA
 merlot2019.resp %>%
+  drop_na() %>% 
   cor() %>%
   corrplot(type = "upper", order = "hclust", tl.col = "black", tl.srt = 45, addCoef.col="white", number.cex=0.7)
 ```
+1. cluster weight and berries cluster (0.94): berries cluster = cluster weight/berries weight)
+
+2. yield and cluster weight(0.76): cluster weight = yield/number of clusters
+
 
 ### merlot 2020
 
 ```{r}
 # correlation matrix before PCA
 merlot2020.resp %>%
+  drop_na() %>% 
   cor() %>%
   corrplot(type = "upper", order = "hclust", tl.col = "black", tl.srt = 45, addCoef.col="white", number.cex=0.7)
 ```
-From the correlation matrix plots, there seem to be no obvious correlations among the response variables in these four datasets. We are good to continue with normality and equal variance assumptions check.
+1. cluster number and yield (0.92)
+
+2. cluster weight and berries cluster (0.92)
+
+3. berry TA and berry PH (0.75)
+
+
+# Exploratory Data Analysis
+
+Visualization (side by side boxplots for each response variable)
+- distributions over treatment :heat/control
+- ignore block for now (for a general view)
+
+
+```{r}
+plot_resp = function(data, resp){
+  ggplot(data, aes(x=treatment, y = .data[[resp]], fill=treatment))+
+    scale_fill_manual(values=c("lightblue2", "seashell2"))+
+    ylab(" ") +
+    xlab(" ") +
+    labs(title = resp) +
+    theme(legend.position = "none")+
+    geom_boxplot()
+}
+```
+
+## Chardonnay 2019
+
+```{r}
+plot_list1= lapply(colnames(char2019.resp), plot_resp, data = chardonnay2019)
+ggarrange(plotlist = plot_list1)
+```
+
+## Chardonnay 2020
+
+```{r}
+plot_list2=lapply(colnames(char2020.resp),plot_resp, data=chardonnay2020)
+ggarrange(plotlist = plot_list2)
+```
+
+## Merlot 2019
+
+```{r}
+plot_list3=lapply(colnames(merlot2019[-c(1:5)]), plot_resp, data=drop_na(merlot2019))
+ggarrange(plotlist = plot_list3)
+```
+
+## Merlot 2020
+
+```{r}
+plot_list4=lapply(colnames(merlot2020[-c(1:5)]), plot_resp, data=drop_na(merlot2020))
+ggarrange(plotlist = plot_list4, heights = 2)
+```
 
 # Handling missing data
 
@@ -258,21 +316,7 @@ char19.tab <- chardonnay2019 %>%
 kable(char19.tab, caption="\\label{char19.summary.table} Summary statistics for outcome variables in the Chardonnay 2019 dataset.")
 ```
 
-2. Visualization (side by side boxplots for each response variable)
-```{r}
-plot_resp = function(data, resp){
-  ggplot(data, aes(x=treatment, y = .data[[resp]], fill=treatment))+
-    scale_fill_manual(values=c("lightblue2", "seashell2"))+
-    ylab(resp) +
-    xlab(" ") +
-    theme(legend.position = "none")+
-    geom_boxplot()
-}
 
-plot_list1= lapply(colnames(char2019.resp), plot_resp, data = chardonnay2019)
-ggarrange(plotlist = plot_list1)
-
-```
 
 
 3. Visualization (side by side boxplots for each response variable + block)
@@ -320,11 +364,7 @@ char20.tab<-chardonnay2020 %>%
 kable(char20.tab, caption="\\label{char20.summary.table} Summary statistics for outcome variables in the Chardonnay 2019 dataset.")
 ```
 
-2. Visualization (side by side boxplots for each response variable) 
-```{r}
-plot_list2=lapply(colnames(char2020.resp),plot_resp, data=chardonnay2020)
-ggarrange(plotlist = plot_list2)
-```
+
 
 3. Visualization (side by side boxplots for each response variable - block)
 ```{r}
@@ -373,12 +413,7 @@ chardonnay2020 %>%
 # kable(mer19.tab, caption="\\label{mer19.summary.table} Summary statistics for outcome variables in the Chardonnay 2019 dataset.")
 ```
 
-2. Visualization (side by side boxplots for each response variable)
 
-```{r}
-plot_list3=lapply(colnames(merlot2019[-c(1:5)]), plot_resp, data=merlot2019)
-ggarrange(plotlist = plot_list3)
-```
 
 3. Visualization (side by side boxplots for each response variable - block)
 
@@ -426,11 +461,7 @@ ggarrange(plotlist = plot_list3)
 
 2. Visualization (side by side boxplots for each response variable)
 
-```{r}
 
-plot_list4=lapply(colnames(merlot2020[-c(1:5)]), plot_resp, data=merlot2020)
-ggarrange(plotlist = plot_list4, heights = 2)
-```
 
 3. Visualization (side by side boxplots for each response variable - block)
 
