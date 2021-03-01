@@ -155,7 +155,9 @@ plot_resp = function(data, resp){
     xlab(" ") +
     labs(title = resp) +
     theme(legend.position = "none")+
-    geom_boxplot()
+    geom_boxplot()+
+    stat_compare_means(method = "t.test", 
+                       label.y = quantile(data[[resp]],prob=0.95))
 }
 ```
 
@@ -315,9 +317,6 @@ char19.tab <- chardonnay2019 %>%
             mean.cluster_weight=mean(av.cluster.weight..kg.))
 kable(char19.tab, caption="\\label{char19.summary.table} Summary statistics for outcome variables in the Chardonnay 2019 dataset.")
 ```
-
-
-
 
 3. Visualization (side by side boxplots for each response variable + block)
 
