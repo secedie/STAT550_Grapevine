@@ -29,10 +29,11 @@ Agro-thermal heat-treatment technology in grapevines has been shown to increase 
 A full description of the recorded variables in the Chardonnay and Merlot studies can be seen in Figure \ref{var.descr.table}. The blocking structure, sample sizes, and a brief overview of missing data are explained below.
 
 ```{r read.data.in, include=FALSE}
-merlot2020 = read.csv("TanjaVoegel_Merlot_2020_data.csv")
-merlot2019 = read.csv("TanjaVoegel_Merlot_2019_data.csv")
 chardonnay2019 = read.csv("TanjaVoegel_Chardonnay_2019_data.csv")
 chardonnay2020 = read.csv("TanjaVoegel_Chardonnay_2020_data.csv")
+merlot2019 = read.csv("TanjaVoegel_Merlot_2019_data.csv")
+merlot2020 = read.csv("TanjaVoegel_Merlot_2020_data.csv")
+addition2021 = read.csv("data addition March 8 2021.csv")
 
 # removing extra columns
 merlot2020 = merlot2020[-(61:65),]
@@ -59,10 +60,17 @@ merlot2019$treatment = as.factor(merlot2019$treatment)
 merlot2019$block = as.factor(merlot2019$block)
 merlot2019$subsample = as.factor(merlot2019$subsample)
 
+
 merlot2020$row = as.factor(merlot2020$row)
 merlot2020$treatment = as.factor(merlot2020$treatment)
 merlot2020$block = as.factor(merlot2020$block)
 merlot2020$subsample = as.factor(merlot2020$subsample)
+
+addition2021$block = factor(addition2021$block)
+addition2021$row = factor(addition2021$row)
+addition2021$subsample = factor(addition2021$subsample)
+merlot2020 = full_join(merlot2020,addition2021, 
+                       by=c("Key","block","treatment","row","subsample"))
 
 ```
 
