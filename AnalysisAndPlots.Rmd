@@ -126,8 +126,11 @@ plot_resp = function(data, resp){
     labs(title = resp) +
     theme(legend.position = "none")+
     geom_boxplot()+
-    stat_compare_means(method = "t.test", 
-                       label.y = quantile(data[[resp]],prob=0.95))
+    stat_compare_means(method = "t.test", label.x = 1.7,
+                       label.y = min(data[[resp]])) +
+    stat_compare_means(method = "wilcox.test", label.x = 0.7,
+                       label.y = min(data[[resp]]))
+    
 }
 ```
 
@@ -162,12 +165,62 @@ ggarrange(plotlist = plot_list4, heights = 2)
 ```
 
 # EDA: Side by side box plots (treatment - blocks)
+
+```{r}
+plot.trt.blk=function(data, resp)
+data %>% 
+  ggplot(aes(x=treatment, y = .data[[resp]], fill=treatment))+
+  scale_fill_manual(values=c("lightblue2", "seashell2"))+
+  geom_boxplot()+
+  labs(title = resp) +
+  theme(legend.position = "none")+
+  ylab(resp)+
+  facet_wrap(~block)+
+  stat_compare_means(method = "wilcox.test", label.x = 0.7,
+                       label.y = min(data[[resp]]))+
+  stat_compare_means(method = "t.test", label.x = 1.7,
+                       label.y = min(data[[resp]]))
+```
+
 ## chardonnay 2019
+
+```{r}
+for (i in colnames(chardonnay2019[-1:-5])){
+  print(plot.trt.blk(chardonnay2019, i))
+}
+```
+
 ## chardonnay 2020
+
+```{r}
+for (i in colnames(chardonnay2020[-1:-5])){
+  print(plot.trt.blk(chardonnay2020, i))
+}
+```
+
 ## merlot 2019
+
+```{r}
+for (i in colnames(merlot2019[-1:-5])){
+  print(plot.trt.blk(merlot2019, i))
+}
+```
+
 ## merlot 2020
 
+```{r}
+for (i in colnames(merlot2020[-1:-5])){
+  print(plot.trt.blk(merlot2020, i))
+}
+```
+
 # Censored data analysis
+
+
+
+
+
+
 
 # Missing data rates
 ## merlot 2019
@@ -218,6 +271,7 @@ for (i in 1:length(resps)) {
   print(comp.rand.blk(chardonnay2019, resps[i]))
 }
 ```
+
 ## chardonnay 2020
 
 ```{r}
@@ -266,9 +320,10 @@ predMatrix[,5] = 0
 merlot2020mice = mice(data = merlot2020, predictorMatrix = predMatrix, seed = 1, method = "norm.predict")
 ```
 
-# two-way ANOVA assumption checks
+# Two-way ANOVA assumption checks
 
 ## chardonnay 2019 equal variance
+
 ```{r}
 resp.char19 <- colnames(chardonnay2019)[-c(1:5)]
 homosc.table.char19 <- array(data=NA, dim=c(length(resp.char19), 2))
@@ -982,42 +1037,106 @@ se <- function(dat, response, colnum) {
 }
 ```
 
+
+# Significantly different interaction effect estimation and multiple comparison
+
 ```{r}
 # get names of responses that we need to do subgroup analysis on (interaction)
-# which(mer.2019.sig[,2] == 1)
-# sub_response = resp.mer19[which(mer.2019.sig[,2] == 1)]
-# 
-# # get colnums
-# cnames = colnames(merlot2019)
-# colnums = rep(0,length(sub_response))
-# for (i in 1:length(sub_response)) {
-#   colnums[i] = which(cnames == sub_response[i])
-# }
-# 
-# for (i in 1:length(sub_response)) {
-#   print(sub_response[i])
-#   eff = effect(merlot2019, sub_response[i], colnums[i])[[3]]
-#   dimnames(eff)[[2]] <- 1:6
-#   dimnames(eff)[[1]] <- c("treatment", "control")
-#   print(eff)
-# }
-# 
-# for (i in 1:length(sub_response)) {
-#   print(sub_response[i])
-#   ses = se(merlot2019, sub_response[i], colnums[i])[[3]]
-#   print(ses)
-#   
-#   c = qr()
-# }
+which(mer.2019.sig[,2] == 1)
+sub_response = resp.mer19[which(mer.2019.sig[,2] == 1)]
 
+for (i in 1:length(sub_response)) {
+  print(sub_response[i])
+  res = aov( eval(parse(text=sub_response[i])) ~ treatment + block + treatment:block, merlot2019)
+  print(tukey_hsd(res, which = "treatment:block"))
+}
 ```
 
 # Repeated measures ANOVA
 
+
+
+
+
+
 # Power calculation
 
+```{r}
+# helper function to find the min difference in block levels
+min.da = function(data, resp){
+  meanresp<-data %>%  
+    select(block, resp) %>% 
+    group_by(block) %>%
+    mutate(mean = mean(.data[[resp]])) %>% 
+    select(block, mean) %>% 
+    distinct()
+  
+  sorted<-sort(meanresp$mean)
+  da=10000
+  
+  for(i in 1:(length(sorted)-1)){
+    curdiff = sorted[i+1]-sorted[i]
+    if (curdiff < da){
+      da = curdiff
+    }else{
+      da = da
+    }
+  }
+  return(da)
+}
 
+# helper function find the min difference for treatment levels
+min.db = function(data,resp){
+  return(abs(mean(data[[resp]][which(data[["treatment"]]=="heat")])
+             -mean(data[[resp]][which(data[["treatment"]]=="control")])))
+}
 
+# function to calculate power
+power=function(data, resp){
+  pwr.2way(a=length(unique(data[["block"]])), 
+           b=length(unique(data[["treatment"]])), 
+           alpha=0.05, 
+           size.A=nrow(data %>% filter(block == 1)), 
+           size.B=nrow(data %>% filter(treatment=="heat")),
+           f.A=min.da(data, resp)/sd(data[[resp]]), 
+           f.B=min.db(data, resp)/sd(data[[resp]]))
+}
+```
 
+## Chardonnay 2019
 
+```{r}
+for (i in colnames(chardonnay2019[-1:-5])){
+  print(i)
+  print(power(chardonnay2019, i))
+}
+```
+
+## Chardonnay 2020
+
+```{r}
+for (i in colnames(chardonnay2020[-1:-5])){
+  print(i)
+  print(power(chardonnay2020, i))
+}
+```
+
+## Merlot 2019
+
+```{r}
+for (i in colnames(merlot2019[c(-1:-5,-7)])){ # excluded veraison 
+  print(i)
+  print(power(merlot2019, i))
+}
+```
+
+## Merlot 2020
+
+```{r}
+mer2020mice1<-complete(merlot2020mice,1)
+for (i in colnames(mer2020mice1[-1:-5])){
+  print(i)
+  print(power(mer2020mice1, i))
+}
+```
 
