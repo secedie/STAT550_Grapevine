@@ -1470,7 +1470,6 @@ Can also combine data from both years and do repeated measures ANOVA?
 
 ## Summary of ANOVA and ART
 
-
 ```{r make.pval.tables}
 
 
@@ -1482,6 +1481,7 @@ resp.char20 <- colnames(chardonnay2020)[-c(1:5)]
 library(ARTool)
 
 # Define a function that computes an ANOVA and ART for each outcome variable in a given dataset
+# output is first the ART and secondly the ANOVA results
 run.anova.art <- function(dat, response.vars) {
   art.mer20 <- vector("list", length(response.vars))
   anova.mer20 <- vector("list", length(response.vars))
@@ -1543,7 +1543,16 @@ char20.test.ptab <-lapply(char20.test.outputs, generate.p.tables)
 
 ```{r print.pval.tables}
 
-# Bold any findings where the p-value is <0.05
+# Now create nicely formatted tables for the results.
+
+kable(mer19.test.ptab[[1]], caption="\\label{ptab.mer19.art} Individual ART models were constructed for each of the outcome variables analyzed in the Merlot 2019 dataset. Reported here are the p-values indicating the significance of the block, treatment, and interaction effects for each of the outcome variables measured.")
+kable(mer19.test.ptab[[2]], caption="\\label{ptab.mer19.anova} Individual ANOVA models were constructed for each of the outcome variables analyzed in the Merlot 2019 dataset. Reported here are the p-values indicating the significance of the block, treatment, and interaction effects for each of the outcome variables measured.")
+kable(mer20.test.ptab[[1]], caption="\\label{ptab.mer20.art} Individual ART models were constructed for each of the outcome variables analyzed in the Merlot 2020 dataset. Reported here are the p-values indicating the significance of the block, treatment, and interaction effects for each of the outcome variables measured.")
+kable(mer20.test.ptab[[2]], caption="\\label{ptab.mer20.anova} Individual ANOVA models were constructed for each of the outcome variables analyzed in the Merlot 2020 dataset. Reported here are the p-values indicating the significance of the block, treatment, and interaction effects for each of the outcome variables measured.")
+kable(char19.test.ptab[[1]], caption="\\label{ptab.char19.art} Individual ART models were constructed for each of the outcome variables analyzed in the Chardonnay 2019 dataset. Reported here are the p-values indicating the significance of the block, treatment, and interaction effects for each of the outcome variables measured.")
+kable(char19.test.ptab[[2]], caption="\\label{ptab.char19.anova} Individual ANOVA models were constructed for each of the outcome variables analyzed in the Chardonnay 2020 dataset. Reported here are the p-values indicating the significance of the block, treatment, and interaction effects for each of the outcome variables measured.")
+kable(char20.test.ptab[[1]], caption="\\label{ptab.char20.art} Individual ART models were constructed for each of the outcome variables analyzed in the Chardonnay 2019 dataset. Reported here are the p-values indicating the significance of the block, treatment, and interaction effects for each of the outcome variables measured.")
+kable(char20.test.ptab[[2]], caption="\\label{ptab.char20.anova} Individual ANOVA models were constructed for each of the outcome variables analyzed in the Chardonnay 2020 dataset. Reported here are the p-values indicating the significance of the block, treatment, and interaction effects for each of the outcome variables measured.")
 
 
 ```
@@ -1590,7 +1599,7 @@ spad.art <- art(SPAD ~ block*treatment + year +
 
 ## MANOVA
 
-```{r}
+```{r chardonnay}
 
 summary(manova(cbind(X..of.clusters, yield..kg., av.cluster.weight..kg.) ~ as.factor(treatment) * as.factor(block), data=chardonnay2020))
 
@@ -1624,5 +1633,7 @@ summary(manova(cbind(berry.TA, berry.pH, berry.Brix) ~ as.factor(treatment)*as.f
 
 ```
 
-MANOVA works best when the response variables are somewhat correlated but do not exhibit strong multicollinearity (which would be if they were over 90% correlated). For the 
+MANOVA works best when the response variables are somewhat correlated but do not exhibit strong multicollinearity (which would be if they were over 90% correlated). The chardonnay 2019 and 2020 datasets indicated that they may be appropriate fits for MANOVA.
+
+Merlot datasets had separt
 
