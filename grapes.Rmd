@@ -1468,44 +1468,7 @@ Also, we may perform **multiple comparison** to see exactly which level of block
 Can also combine data from both years and do repeated measures ANOVA?
 
 
-## Repeated-measures ANOVA
-
-```{r}
-
-# First, let's combine the merlot2019 and merlot2020 datasets
-merlot2019$year <- 2019
-merlot2020mice$year <- 2020
-
-names(merlot.bothyr)[[1]] <- "Key"
-
-# Do the same for Chardonnay
-chardonnay2019$year <- 2019
-chardonnay2020$year <- 2020
-chardonnay.bothyr <- rbind.fill(chardonnay2019, chardonnay2020)
-```
-
-```{r}
-
-# Repeated-measures ANOVA. 
-merlot.variables <- c("SPAD", "cluster.number", "yield", "cluster.weight",
-                      "berries.cluster", "berry.weight")
-merlot.imputed.vars <- c("berry.TA", "berry.pH", "berry.Brix")
-
-for (var in merlot.variables) {
-  # Repeated-measures ANOVA
-  rep.aov <- aov(eval(deparse(text=var)) ~ block*treatment + 
-                   year*treatment + Error(Key), 
-            data=merlot.bothyr)
-}
-
-spad.art <- art(SPAD ~ block*treatment + year +
-                (1 | Key), 
-            data=merlot.bothyr)
-
-
-```
-
-
+## Summary of ANOVA and ART
 
 
 ```{r make.pval.tables}
@@ -1577,4 +1540,89 @@ char20.test.ptab <-lapply(char20.test.outputs, generate.p.tables)
 
 
 ```
+
+```{r print.pval.tables}
+
+# Bold any findings where the p-value is <0.05
+
+
+```
+
+
+## Repeated-measures ANOVA
+
+```{r}
+
+# First, let's combine the merlot2019 and merlot2020 datasets
+merlot2019$year <- 2019
+merlot2020mice$year <- 2020
+
+names(merlot.bothyr)[[1]] <- "Key"
+
+# Do the same for Chardonnay
+chardonnay2019$year <- 2019
+chardonnay2020$year <- 2020
+chardonnay.bothyr <- rbind.fill(chardonnay2019, chardonnay2020)
+```
+
+```{r}
+
+# Repeated-measures ANOVA. 
+merlot.variables <- c("SPAD", "cluster.number", "yield", "cluster.weight",
+                      "berries.cluster", "berry.weight")
+merlot.imputed.vars <- c("berry.TA", "berry.pH", "berry.Brix")
+
+for (var in merlot.variables) {
+  # Repeated-measures ANOVA
+  rep.aov <- aov(eval(deparse(text=var)) ~ block*treatment + 
+                   year*treatment + Error(Key), 
+            data=merlot.bothyr)
+}
+
+spad.art <- art(SPAD ~ block*treatment + year +
+                (1 | Key), 
+            data=merlot.bothyr)
+
+
+```
+
+
+
+## MANOVA
+
+```{r}
+
+summary(manova(cbind(X..of.clusters, yield..kg., av.cluster.weight..kg.) ~ as.factor(treatment) * as.factor(block), data=chardonnay2020))
+
+summary(manova(cbind(X..of.clusters, yield..kg., av.cluster.weight..kg.) ~ as.factor(treatment) * as.factor(block), data=chardonnay2019))
+
+```
+
+```{r manova.merlot2019}
+
+# Yield-related measures
+summary(manova(cbind(cluster.number, yield, cluster.weight, berries.cluster, berry.weight) ~ as.factor(treatment) * as.factor(block), data=merlot2019))
+
+# Growth-related measures
+summary(manova(cbind(SPAD, pruning.weight, Ravaz.index) ~ as.factor(treatment) * as.factor(block), data=merlot2019))
+
+# Quality-related measures
+summary(manova(cbind(berry.TA, berry.pH, berry.Brix) ~ as.factor(treatment)*as.factor(block), data=merlot2019))
+
+```
+
+```{r manova.merlot2020}
+
+# Yield-related measures
+summary(manova(cbind(cluster.number, yield, cluster.weight, berries.cluster, berry.weight) ~ as.factor(treatment) * as.factor(block), data=complete(merlot2020mice, 1)))
+
+# Growth-related measures
+summary(manova(cbind(SPAD, pruning.weight, Ravaz.index) ~ as.factor(treatment) * as.factor(block), data=complete(merlot2020mice, 1)))
+
+# Quality-related measures
+summary(manova(cbind(berry.TA, berry.pH, berry.Brix) ~ as.factor(treatment)*as.factor(block), data=complete(merlot2020mice, 1)))
+
+```
+
+MANOVA works best when the response variables are somewhat correlated but do not exhibit strong multicollinearity (which would be if they were over 90% correlated). For the 
 
