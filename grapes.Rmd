@@ -958,6 +958,7 @@ for (i in 1:dim(non.norm)[1]) {
 
 As previously discussed, Bloom and Veraison were both censored data for the Merlot datasets. For some of the plants, 100% bloom or veraison had already occurred, so the event (50% bloom or veraison) was left-censored. For other plants, the berries or flowers had not yet grown, indicating that the event was right-censored (the event had not yet been observed). In this analysis, we discern the two groups by whether or not the number of clusters reported is greater than or equal to zero. If there were no clusters, then we assume right-censoring; otherwise, we assume left-censoring.
 
+
 Both bloom and veraison were measured three times (at times T1, T2, and T3), and the approximate event date (50% veraison or 50% bloom) was determined using a linear regression. There are two types of missing data: 
 
 (1) The event did not occur because no berries or flowers grew. This is known as right-censored data. In this case, the event happened in the interval (T3,Inf)
@@ -969,6 +970,9 @@ For Veraison, T1=August 31 (= 31), T2=September 2 (= 33), and T3=September 5 (36
 Additionally, for veraison, until we hear from the client, we can impute the lower bound of the interval for left-censored data as the 50% bloom date, since we know berry ripening would happen sometime after flowers blooming.
 
 After treating the data as interval data, we can then construct Cox proportional hazards models to fit the data. We used tools in an R package called icenReg, which uses bootstrapping for inference on the regression parameters to perform hypothesis testing.
+
+Results indicate that neither the treatment nor the block effects influenced Veraison in either 2019 or 2020. Bloom was influenced by block effect but not by the treatment.
+
 
 ```{r surv.2020}
 
@@ -983,16 +987,23 @@ icen.mer20 <- with(merlot2020, {
   # If the data isn't censored (non-NA bloom), let the start and end be equal to each other
   icen.mer20 <- data.frame("bloom.start"=bloom, "bloom.end"=bloom,
                            "verais.start"=veraison, "verais.end"=veraison,
-                           "trt"=treatment, "block"=block)
+                           "trt"=treatment, "block"=block,
+                           "verais.indicator"="observed",
+                           "bloom.indicator"="observed")
 
   # If the data is right-censored (cluster.number==0; event happened after
   # the study period of interest), then let the "start" be the imputed value
   # and set the ending value to Inf
-  icen.mer20$bloom.start[is.na(bloom) & cluster.number==0] <- bloom.t3
-  icen.mer20$bloom.end[is.na(bloom) & cluster.number==0] <- Inf
+  right.bloom <- is.na(bloom) & cluster.number==0
+  icen.mer20$bloom.start[right.bloom] <- bloom.t3
+  icen.mer20$bloom.end[right.bloom] <- Inf
+  icen.mer20$bloom.indicator[right.bloom] <- "right-censored"
   
-  icen.mer20$verais.start[is.na(veraison) & cluster.number==0] <- ver.t3
-  icen.mer20$verais.end[is.na(veraison) & cluster.number==0] <- Inf
+  right.ver <- is.na(veraison) & cluster.number==0
+  icen.mer20$verais.start[right.ver] <- ver.t3
+  icen.mer20$verais.end[right.ver] <- Inf
+  icen.mer20$verais.indicator[right.ver] <- "right-censored"
+
   
   # If the data is left-censored (event happened before we started recording Veraison)
   # (cluster.number>0), then let the "end" be the imputed value and
@@ -1001,22 +1012,33 @@ icen.mer20 <- with(merlot2020, {
   left.bloom <- is.na(bloom) & cluster.number>0
   icen.mer20$bloom.start[left.bloom] <- -Inf
   icen.mer20$bloom.end[left.bloom] <- bloom.t1
+  icen.mer20$bloom.indicator[left.bloom] <- "left-censored"
   
   left.ver <- is.na(veraison) & cluster.number>0
-  icen.mer20$verais.start[left.ver] <- max(bloom[left.ver]-61, -Inf, na.rm=T)
+  icen.mer20$verais.start[left.ver] <- unlist(lapply(bloom[left.ver]-61, 
+                                                     function(x){max(-Inf, x, na.rm=T)}))
   icen.mer20$verais.end[left.ver] <- ver.t1
+  icen.mer20$verais.indicator[left.ver] <- "left-censored"
+  
+  # Take note of any interval-censored data
+    icen.mer20$verais.indicator[left.ver & right.ver] <- "interval-censored"
+    icen.mer20$bloom.indicator[left.bloom & right.bloom] <- "interval-censored"
+
+  
   return(icen.mer20)
+  
+  
   })
 
 
 library(icenReg)
 # Build a model for the bloom data
-coxph.bloom20 <- ic_sp(cbind(bloom.start,bloom.end) ~ trt + as.factor(block), 
-               data=icen.mer20, model='ph', bs_samples=100)
+coxph.bloom20 <- ic_sp(cbind(bloom.start,bloom.end) ~  as.factor(trt) * as.factor(block),
+               data=icen.mer20, model='ph', bs_samples=500)
 
 # Build a model for the veraison data
-coxph.ver20 <- ic_sp(cbind(verais.start,verais.end) ~ trt + as.factor(block), 
-               data=icen.mer20, model='ph', bs_samples=100)
+coxph.ver20 <- ic_sp(cbind(verais.start,verais.end) ~  as.factor(trt) * as.factor(block),
+               data=icen.mer20, model='ph', bs_samples=500)
 
 
 ```
@@ -1028,13 +1050,16 @@ icen.mer19 <- with(merlot2019, {
   
   # If the data isn't censored (non-NA bloom), let the start and end be equal to each other
   icen.mer19 <- data.frame("verais.start"=veraison, "verais.end"=veraison,
-                           "trt"=treatment, "block"=block)
+                           "trt"=treatment, "block"=block,
+                           "verais.indicator"=c("observed"))
 
   # If the data is right-censored (cluster.number==0; event happened after
   # the study period of interest), then let the "start" be the T3 value
   # and set the ending value to Inf
-  icen.mer19$verais.start[is.na(merlot2019$veraison) & cluster.number==0] <- ver.t1
-  icen.mer19$verais.end[is.na(merlot2019$veraison) & cluster.number==0] <- Inf
+  right.ver <- is.na(merlot2019$veraison) & cluster.number==0
+  icen.mer19$verais.start[right.ver] <- ver.t1
+  icen.mer19$verais.end[right.ver] <- Inf
+  icen.mer19$verais.indicator[right.ver] <- "right-censored"
   
   
   # If the data is left-censored (event happened before we started recording Veraison)
@@ -1042,19 +1067,170 @@ icen.mer19 <- with(merlot2019, {
   # set the starting value to -Inf
   left.ver <- is.na(merlot2019$veraison) & cluster.number>0
   icen.mer19$verais.start[left.ver] <- -Inf
-  icen.mer19$verais.end[left.ver] <- ver.t3
+  icen.mer19$verais.end[left.ver] <- ver.t1
+  icen.mer19$verais.indicator[left.ver] <- "left-censored"
+  
+  # Also take note of both left-censored and right-censored data:
+  icen.mer19$verais.indicator[left.ver & right.ver] <- "interval-censored"
+
   
   return(icen.mer19)
   })
 
 # Build a model for the veraison data
-coxph.ver19 <- ic_sp(cbind(verais.start,verais.end) ~ trt + as.factor(block), 
+coxph.ver19 <- ic_sp(cbind(verais.start,verais.end) ~ as.factor(trt) * as.factor(block), 
                   data=icen.mer19, model='ph', bs_samples=100)
 
 
 ```
 
-Results indicate that neither the treatment nor the block effects influenced Veraison in either 2019 or 2020. Bloom was influenced by block effect but not by the treatment.
+
+### Censor plots
+
+```{r define.censor.plot.data}
+# Let's make a plot to better visualize the censored data
+censor.plot.mer20 <- icen.mer20
+censor.plot.mer20$verais.point <- ifelse(censor.plot.mer20$verais.indicator %in% 
+                                           c("left-censored", "observed"),
+                                         censor.plot.mer20$verais.end,
+                                         ifelse(censor.plot.mer20$verais.indicator=="right-censored",
+                                         censor.plot.mer20$verais.start, NA))
+censor.plot.mer20$verais.indicator <- factor(censor.plot.mer20$verais.indicator,
+                                                levels=c("observed", "right-censored", "left-censored"))
+censor.plot.mer20$order.verais <- order(censor.plot.mer20$verais.point)
+censor.plot.mer20$bloom.point <- ifelse(censor.plot.mer20$bloom.indicator %in% 
+                                           c("left-censored", "observed"),
+                                         censor.plot.mer20$bloom.end,
+                                         ifelse(censor.plot.mer20$bloom.indicator=="right-censored",
+                                         censor.plot.mer20$bloom.start, NA))
+censor.plot.mer20$bloom.indicator <- factor(censor.plot.mer20$bloom.indicator,
+                                                levels=c("observed", "right-censored", "left-censored"))
+censor.plot.mer20$order.bloom <- order(censor.plot.mer20$bloom.point)
+
+```
+
+```{r ver.2020}
+ver20.cplot <- ggplot(censor.plot.mer20, aes(x=verais.point, y=order.verais, color=trt, shape=verais.indicator)) +
+  geom_point() +
+  # Style the graph
+  xlim(c(10, 40)) + labs(title="Merlot 2020 Veraison Data") +
+  xlab("Day") + ylab("Sample") + theme_bw() +
+  
+  scale_shape_manual(values=c(19, 0, 1), name="Start/end of intervals") +
+  
+  # Draw dotted lines for right-censored data
+  geom_linerange(xmax=40, aes(xmin = verais.point, 
+                              linetype = as.character(as.numeric(verais.indicator))),
+                 size=1) +
+  # Draw dotted lines for left-censored data
+  geom_linerange(xmin = 10, aes(xmax = verais.point, 
+                                linetype = as.character(as.numeric(verais.indicator)+3)),
+                 size=1) +  
+  # Draw solid lines for non-censored data
+  geom_linerange(xmin = 15, aes(xmax = verais.point, 
+                                linetype = as.character(as.numeric(verais.indicator)+6)),
+                 size=1) + 
+  scale_linetype_manual(values=c("1"="blank", "2"="dotted", "3"="blank",
+                                 "4"="blank", "5"="blank", "6"="dotted",
+                                 "7"="solid", "8"="solid", "9"="blank"),
+                        guide=FALSE) +
+  
+  # Add in the T1 and T3 times
+  geom_vline(xintercept=ver.t1, linetype="dashed", color="black") +
+  geom_vline(xintercept=ver.t3, linetype="dashed", color="black") +
+  geom_vline(xintercept=15, linetype="dashed", color="black")
+  
+
+```
+
+```{r bloom.2020}
+
+bloom20.cplot <- ggplot(censor.plot.mer20, aes(x=bloom.point, y=order.bloom, color=trt, shape=bloom.indicator)) +
+  geom_point() +
+  # Style the graph
+  xlim(c(10, 40)) + labs(title="Merlot 2020 Bloom Data") +
+  xlab("Day") + ylab("Sample") + theme_bw() +
+  
+  scale_shape_manual(values=c(19, 0, 1), name="Start/end of intervals") +
+  
+  # Draw dotted lines for right-censored data
+  geom_linerange(xmax=40, aes(xmin = bloom.point, 
+                              linetype = as.character(as.numeric(bloom.indicator))),
+                 size=1) +
+  # Draw dotted lines for left-censored data
+  geom_linerange(xmin = 10, aes(xmax = bloom.point, 
+                                linetype = as.character(as.numeric(bloom.indicator)+3)),
+                 size=1) +  
+  # Draw solid lines for non-censored data
+  geom_linerange(xmin = 15, aes(xmax = bloom.point, 
+                                linetype = as.character(as.numeric(bloom.indicator)+6)),
+                 size=1) + 
+  scale_linetype_manual(values=c("1"="blank", "2"="dotted", "3"="blank",
+                                 "4"="blank", "5"="blank", "6"="dotted",
+                                 "7"="solid", "8"="solid", "9"="blank"),
+                        guide=FALSE) +
+  
+  # Add in the T1 and T3 times
+  geom_vline(xintercept=bloom.t1, linetype="dashed", color="black") +
+  geom_vline(xintercept=bloom.t3, linetype="dashed", color="black") +
+  geom_vline(xintercept=15, linetype="dashed", color="black")
+  
+
+```
+
+```{r ver.2019}
+
+censor.plot.mer19 <- icen.mer19
+censor.plot.mer19$verais.point <- ifelse(censor.plot.mer19$verais.indicator %in% 
+                                           c("left-censored", "observed"),
+                                         censor.plot.mer19$verais.end,
+                                         ifelse(censor.plot.mer19$verais.indicator=="right-censored",
+                                         censor.plot.mer19$verais.start, NA))
+censor.plot.mer19$verais.indicator <- factor(censor.plot.mer19$verais.indicator,
+                                                levels=c("observed", "right-censored", "left-censored"))
+censor.plot.mer19$order.verais <- order(censor.plot.mer19$verais.point)
+
+
+ver19.cplot <- ggplot(censor.plot.mer19, aes(x=verais.point, y=order.verais, color=trt, shape=verais.indicator)) +
+  geom_point() +
+  # Style the graph
+  xlim(c(5, 40)) + labs(title="Merlot 2019 Veraison Data") +
+  xlab("Day") + ylab("Sample") + theme_bw() +
+  
+  scale_shape_manual(values=c(19, 0, 1), name="Start/end of intervals") +
+  
+  # Draw dotted lines for right-censored data
+  geom_linerange(xmax=40, aes(xmin = verais.point, 
+                              linetype = as.character(as.numeric(verais.indicator))),
+                 size=1) +
+  # Draw dotted lines for left-censored data
+  geom_linerange(xmin = 5, aes(xmax = verais.point, 
+                                linetype = as.character(as.numeric(verais.indicator)+3)),
+                 size=1) +  
+  # Draw solid lines for non-censored data
+  geom_linerange(xmin = 10, aes(xmax = verais.point, 
+                                linetype = as.character(as.numeric(verais.indicator)+6)),
+                 size=1) + 
+  scale_linetype_manual(values=c("1"="blank", "2"="dotted", "3"="blank",
+                                 "4"="blank", "5"="blank", "6"="dotted",
+                                 "7"="solid", "8"="solid", "9"="blank"),
+                        guide=FALSE) +
+  
+  # Add in the T1 and T3 times
+  geom_vline(xintercept=ver.t1, linetype="dashed", color="black") +
+  geom_vline(xintercept=ver.t3, linetype="dashed", color="black") +
+  geom_vline(xintercept=10, linetype="dashed", color="black")
+  
+
+```
+
+```{r combine.censor.plots}
+library(gridExtra)
+grid.arrange(ver19.cplot, ver20.cplot, bloom20.cplot, nrow=2, ncol=2)
+
+```
+
+
 
 ### Visual  analysis: censored data
 
@@ -1073,9 +1249,8 @@ plot(coxph.ver20, newdata, col=colorsch, lgdLocation="bottomleft", main="2020 Ve
 
 ```{r fig.cap="\\label{plot.ver} Probability of 50% Bloom happening x days into July for the Merlot 2020 vineyard."}
 
-par(mfrow=c(1,1))
+par(mfrow=c(1,1), mar=c(3,3,3,1))
 plot(coxph.bloom20, newdata, col=colorsch, lgdLocation="bottomleft", main="Bloom")
-
 
 ```
 
@@ -1557,7 +1732,6 @@ kable(char20.test.ptab[[2]], caption="\\label{ptab.char20.anova} Individual ANOV
 
 ```
 
-
 ## Repeated-measures ANOVA
 
 ```{r}
@@ -1576,7 +1750,7 @@ chardonnay.bothyr <- rbind.fill(chardonnay2019, chardonnay2020)
 
 ```{r}
 
-# Repeated-measures ANOVA. 
+# Repeated-measures ANOVA
 merlot.variables <- c("SPAD", "cluster.number", "yield", "cluster.weight",
                       "berries.cluster", "berry.weight")
 merlot.imputed.vars <- c("berry.TA", "berry.pH", "berry.Brix")
@@ -1588,13 +1762,7 @@ for (var in merlot.variables) {
             data=merlot.bothyr)
 }
 
-spad.art <- art(SPAD ~ block*treatment + year +
-                (1 | Key), 
-            data=merlot.bothyr)
-
-
 ```
-
 
 
 ## MANOVA
