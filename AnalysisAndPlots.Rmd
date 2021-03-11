@@ -73,6 +73,7 @@ library(MKinfer)
 library(rstatix) # for the repeated-measures ANOVA
 library(ARTool) # for aligned rank transform
 library(maditr) # for dcast
+library(pwr2)
 ```
 
 # EDA: correlation
