@@ -267,18 +267,31 @@ comp.rand.blk<- function(data, resp) {
 
 ```{r}
 resps = colnames(chardonnay2019)[6:8]
+char.2019.cc = array(data=rep(0, length(resps) * 2), dim=c(length(resps), 2))
+dimnames(char.2019.cc)[[2]] <- c("treatment", "block")
+dimnames(char.2019.cc)[[1]] <- resps
+
 for (i in 1:length(resps)) {
-  print(comp.rand.blk(chardonnay2019, resps[i]))
+  res = comp.rand.blk(chardonnay2019, resps[i])
+  char.2019.cc[i,] = res[[1]][["Pr(>F)"]][1:2]
+  print(res)
 }
+print(char.2019.cc)
 ```
 
 ## chardonnay 2020
 
 ```{r}
 resps = colnames(chardonnay2020)[6:8]
+char.2020.cc = array(data=rep(0, length(resps) * 2), dim=c(length(resps), 2))
+dimnames(char.2020.cc)[[2]] <- c("treatment", "block")
+dimnames(char.2020.cc)[[1]] <- resps
 for (i in 1:length(resps)) {
-  print(comp.rand.blk(chardonnay2020, resps[i]))
+  res = comp.rand.blk(chardonnay2020, resps[i])
+  char.2020.cc[i,] = res[[1]][["Pr(>F)"]][1:2]
+  print(res)
 }
+print(char.2020.cc)
 ```
 
 ## merlot 2019
@@ -286,9 +299,15 @@ for (i in 1:length(resps)) {
 ```{r}
 resps = colnames(merlot2019)[6:17]
 resps = resps[-2] # remove veraison
+mer.2019.cc = array(data=rep(0, length(resps) * 2), dim=c(length(resps), 2))
+dimnames(mer.2019.cc)[[2]] <- c("treatment", "block")
+dimnames(mer.2019.cc)[[1]] <- resps
 for (i in 1:length(resps)) {
-  print(comp.rand.blk(merlot2019, resps[i]))
+  res = comp.rand.blk(merlot2019, resps[i])
+  mer.2019.cc[i,] = res[[1]][["Pr(>F)"]][1:2]
+  print(res)
 }
+print(mer.2019.cc)
 ```
 
 ## merlot 2020
@@ -296,9 +315,15 @@ for (i in 1:length(resps)) {
 ```{r}
 resps = colnames(merlot2020)[6:20]
 resps = resps[-c(2,4)] # remove veraison and bloom
+mer.2020.cc = array(data=rep(0, length(resps) * 2), dim=c(length(resps), 2))
+dimnames(mer.2020.cc)[[2]] <- c("treatment", "block")
+dimnames(mer.2020.cc)[[1]] <- resps
 for (i in 1:length(resps)) {
-  print(comp.rand.blk(merlot2020, resps[i]))
+  res = comp.rand.blk(merlot2020, resps[i])
+  mer.2020.cc[i,] = res[[1]][["Pr(>F)"]][1:2]
+  print(res)
 }
+print(mer.2020.cc)
 ```
 
 # Multiple Imputation
