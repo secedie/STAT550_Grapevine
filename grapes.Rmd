@@ -683,7 +683,7 @@ resp.mer19 <- colnames(merlot2019)[-c(1:5, 7)]
 resp.mer20 <- colnames(merlot2020)[-c(1:5, 7,9)]
 
 # Create some tables to save the results of our statistical tests in
-homosc.table.mer19 <- array(data=NA, dim=c(length(resp.mer19), 2, 5))
+homosc.table.mer19 <- array(data=NA, dim=c(length(resp.mer19), 2))
 dimnames(homosc.table.mer19)[[2]] <- c("Bartlett", "Levene")
 dimnames(homosc.table.mer19)[[1]] <- resp.mer19
 
@@ -695,14 +695,10 @@ dimnames(homosc.table.mer20)[[1]] <- resp.mer20
 for (i in 1:length(resp.mer19)) {
 
   # the lapply function simply extracts the p-value from each outputted run of the MICE data
-  bart.p <- unlist(lapply(with(merlot2019,
-                               bartlett.test(eval(parse(text=resp.mer19[i])) ~ paste(treatment, block)))$analyses,
-                          FUN=function(x){x$p.value}))
-  lev.p  <- unlist(lapply(with(merlot2019,
-                        levene.test(eval(parse(text=resp.mer19[i])), paste(treatment, block)))$analyses,
-                          FUN=function(x){x$p.value}))
-  homosc.table.mer19[i,1,] <- bart.p
-  homosc.table.mer19[i,2,] <- lev.p
+  bart.p <- bartlett.test(eval(parse(text=resp.mer19[i])) ~ paste(treatment, block), data=merlot2019)$p.value
+  lev.p  <- with(merlot2019, levene.test(eval(parse(text=resp.mer19[i])), paste(treatment, block))$p.value)
+  homosc.table.mer19[i,1] <- bart.p
+  homosc.table.mer19[i,2] <- lev.p
 }
 
 
@@ -713,6 +709,39 @@ uneq.var.mer19 <- apply(homosc.table.mer19, c(1,2), function(x){sum(x<0.05)})
 # unequal variances
 par(mfrow=c(sum(rowSums(uneq.var.mer19)>0),1))
 lapply(rownames(uneq.var.mer19)[rowSums(uneq.var.mer19)>0], function(x){
+  with(merlot2019,
+       boxplot(cluster.weight ~ paste0(block, treatment))
+       )[[1]]})
+```
+
+```{r homoscedas.merlot20}
+library(lawstat)
+# Create lists of the variables we want to check for homoscedasticity and normality
+resp.mer20 <- colnames(merlot2020)[-c(1:5, 7,9)]
+
+# Create some tables to save the results of our statistical tests in
+homosc.table.mer20 <- array(data=NA, dim=c(length(resp.mer20), 2))
+dimnames(homosc.table.mer20)[[2]] <- c("Bartlett", "Levene")
+dimnames(homosc.table.mer20)[[1]] <- resp.mer20
+
+# Compare variances for each unique treatment-block group
+for (i in 1:length(resp.mer20)) {
+
+  # the lapply function simply extracts the p-value from each outputted run of the MICE data
+  bart.p <- bartlett.test(eval(parse(text=resp.mer20[i])) ~ paste(treatment, block), data=complete(merlot2020mice, 1))$p.value
+  lev.p  <- with(complete(merlot2020mice, 1), levene.test(eval(parse(text=resp.mer20[i])), paste(treatment, block))$p.value)
+  homosc.table.mer20[i,1] <- bart.p
+  homosc.table.mer20[i,2] <- lev.p
+}
+
+
+# Check out how many of the tests came back with a significant result
+uneq.var.mer20 <- apply(homosc.table.mer20, c(1,2), function(x){sum(x<0.05)})
+
+# Boxplots of the first imputation dataset for the variables with potentially
+# unequal variances
+par(mfrow=c(sum(rowSums(uneq.var.mer20)>0),1))
+lapply(rownames(uneq.var.mer20)[rowSums(uneq.var.mer20)>0], function(x){
   with(merlot2019,
        boxplot(cluster.weight ~ paste0(block, treatment))
        )[[1]]})

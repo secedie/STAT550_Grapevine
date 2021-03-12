@@ -76,6 +76,7 @@ library(rstatix) # for the repeated-measures ANOVA
 library(ARTool) # for aligned rank transform
 library(maditr) # for dcast
 library(pwr2)
+library(plyr) # for rbind.fill
 ```
 
 # EDA: correlation
@@ -218,6 +219,117 @@ for (i in colnames(merlot2020[-1:-5])){
 ```
 
 # Censored data analysis
+
+```{r surv.2020}
+
+# Define T1 and T3, the first and last sampling times, for bloom and veraison
+bloom.t1 <- 25
+bloom.t3 <- 31
+ver.t1 <- 31
+ver.t3 <- 36
+
+# First define our dataset of start and end times for our event intervals
+icen.mer20 <- with(merlot2020, {
+  
+  # If the data isn't censored (non-NA bloom), let the start and end be equal to each other
+  icen.mer20 <- data.frame("bloom.start"=bloom, "bloom.end"=bloom,
+                           "verais.start"=veraison, "verais.end"=veraison,
+                           "trt"=treatment, "block"=block,
+                           "verais.indicator"="observed",
+                           "bloom.indicator"="observed")
+
+  # If the data is right-censored (cluster.number==0; event happened after
+  # the study period of interest), then let the "start" be the imputed value
+  # and set the ending value to Inf
+  right.bloom <- is.na(bloom) & cluster.number==0
+  icen.mer20$bloom.start[right.bloom] <- bloom.t3
+  icen.mer20$bloom.end[right.bloom] <- Inf
+  icen.mer20$bloom.indicator[right.bloom] <- "right-censored"
+  
+  right.ver <- is.na(veraison) & cluster.number==0
+  icen.mer20$verais.start[right.ver] <- ver.t3
+  icen.mer20$verais.end[right.ver] <- Inf
+  icen.mer20$verais.indicator[right.ver] <- "right-censored"
+
+  
+  # If the data is left-censored (event happened before we started recording Veraison)
+  # (cluster.number>0), then let the "end" be the imputed value and
+  # set the starting value to -Inf
+  # For veraison, we can set the starting value to the max of -Inf and the 50% bloom date
+  left.bloom <- is.na(bloom) & cluster.number>0
+  icen.mer20$bloom.start[left.bloom] <- -Inf
+  icen.mer20$bloom.end[left.bloom] <- bloom.t1
+  icen.mer20$bloom.indicator[left.bloom] <- "left-censored"
+  
+  left.ver <- is.na(veraison) & cluster.number>0
+  icen.mer20$verais.start[left.ver] <- unlist(lapply(bloom[left.ver]-61, 
+                                                     function(x){max(-Inf, x, na.rm=T)}))
+  icen.mer20$verais.end[left.ver] <- ver.t1
+  icen.mer20$verais.indicator[left.ver] <- "left-censored"
+  
+  # Take note of any interval-censored data
+    icen.mer20$verais.indicator[left.ver & right.ver] <- "interval-censored"
+    icen.mer20$bloom.indicator[left.bloom & right.bloom] <- "interval-censored"
+
+  
+  return(icen.mer20)
+  
+  
+  })
+
+
+library(icenReg)
+# Build a model for the bloom data
+coxph.bloom20 <- ic_sp(cbind(bloom.start,bloom.end) ~  as.factor(trt) * as.factor(block),
+               data=icen.mer20, model='ph', bs_samples=100)
+
+# Build a model for the veraison data
+coxph.ver20 <- ic_sp(cbind(verais.start,verais.end) ~  as.factor(trt) * as.factor(block),
+               data=icen.mer20, model='ph', bs_samples=100)
+
+
+```
+
+```{r surv.2019}
+
+# First define our dataset of start and end times for our event intervals
+icen.mer19 <- with(merlot2019, {
+  
+  # If the data isn't censored (non-NA bloom), let the start and end be equal to each other
+  icen.mer19 <- data.frame("verais.start"=veraison, "verais.end"=veraison,
+                           "trt"=treatment, "block"=block,
+                           "verais.indicator"=c("observed"))
+
+  # If the data is right-censored (cluster.number==0; event happened after
+  # the study period of interest), then let the "start" be the T3 value
+  # and set the ending value to Inf
+  right.ver <- is.na(merlot2019$veraison) & cluster.number==0
+  icen.mer19$verais.start[right.ver] <- ver.t1
+  icen.mer19$verais.end[right.ver] <- Inf
+  icen.mer19$verais.indicator[right.ver] <- "right-censored"
+  
+  
+  # If the data is left-censored (event happened before we started recording Veraison)
+  # (cluster.number>0), then let the "end" be T3 and
+  # set the starting value to -Inf
+  left.ver <- is.na(merlot2019$veraison) & cluster.number>0
+  icen.mer19$verais.start[left.ver] <- -Inf
+  icen.mer19$verais.end[left.ver] <- ver.t1
+  icen.mer19$verais.indicator[left.ver] <- "left-censored"
+  
+  # Also take note of both left-censored and right-censored data:
+  icen.mer19$verais.indicator[left.ver & right.ver] <- "interval-censored"
+
+  
+  return(icen.mer19)
+  })
+
+# Build a model for the veraison data
+coxph.ver19 <- ic_sp(cbind(verais.start,verais.end) ~ as.factor(trt) * as.factor(block), 
+                  data=icen.mer19, model='ph', bs_samples=100)
+
+
+```
 
 
 
@@ -949,6 +1061,100 @@ for (i in 1:length(sub_response)) {
 ```
 
 # Repeated measures ANOVA
+
+
+```{r}
+
+# First, let's combine the merlot2019 and merlot2020 datasets
+merlot2019$year <- 2019
+merlot2020mice$year <- 2020
+merlot.bothyr <- rbind.fill(merlot2019, complete(merlot2020mice, 1))
+
+names(merlot.bothyr)[[1]] <- "Key"
+
+# Do the same for Chardonnay
+chardonnay2019$year <- 2019
+chardonnay2020$year <- 2020
+chardonnay.bothyr <- rbind.fill(chardonnay2019, chardonnay2020)
+```
+
+```{r}
+
+# This function takes a list of repeated-measures aov objects and
+# summarizes the p-values in a coherent table
+generate.p.tables.aov <- function(x){
+  
+  # First, for each test, extract just the coefficients and their significances
+  ww <- lapply(x, function(t){as.data.frame(unclass(summary(t)[[1]]))})
+  
+  # Now for each table, add in variables indicating the variable we are looking at
+  # in the test, as well as the covariate that the row is talking about
+  ww <- lapply(1:length(ww), 
+                      function(t,xx=ww){cbind(xx[[t]][1:3,], 
+                                        data.frame("Var"=rep(names(xx)[t],3),
+                                                   "Covar"=rownames(xx[[t]])[1:3]))})
+  # Bind all of the results for the tests together into one large data frame
+  ww <- do.call(rbind.data.frame, ww)
+
+  # Create a table that indicates p-values
+  ww.ptab <- dcast(ww, Var~Covar, value.var="Pr..F.")
+  # Round to three decimal places to clean up the table
+  ww.ptab[,c(2:4)] <- round(ww.ptab[,c(2:4)], 3)
+  return(ww.ptab)
+}
+
+```
+
+
+```{r}
+
+# Repeated-measures ANOVA for the merlot dataset
+merlot.variables <- c("SPAD", "cluster.number", "yield", "cluster.weight",
+                      "berries.cluster", "berry.weight")
+merlot.imputed.vars <- c("berry.TA", "berry.pH", "berry.Brix", "pruning.weight", "Ravaz.index")
+merlot.variables <- c(merlot.variables, merlot.imputed.vars)
+
+rep.aov <- vector("list", length=length(merlot.variables))
+names(rep.aov) <- merlot.variables
+for (i in 1:length(merlot.variables)) {
+  # Repeated-measures ANOVA
+  rep.aov[[i]] <- aov(eval(parse(text=merlot.variables[i])) ~ block*treatment + 
+                   year*treatment + Error(Key), 
+            data=merlot.bothyr)
+}
+# Now summarize the results in one table!
+generate.p.tables.aov(rep.aov)
+kable(generate.p.tables.aov(rep.aov), "latex")
+
+
+```
+
+```{r}
+
+
+# Repeated-measures ANOVA for the merlot dataset
+chardonnay.variables <- c("X..of.clusters", "yield..kg.", "av.cluster.weight..kg.")
+
+rep.aov <- vector("list", length=length(chardonnay.variables))
+names(rep.aov) <- chardonnay.variables
+for (i in 1:length(chardonnay.variables)) {
+  # Repeated-measures ANOVA
+  rep.aov[[i]] <- aov(eval(parse(text=chardonnay.variables[i])) ~ block*treatment + 
+                   year*treatment + Error(ï..sample.ID), 
+            data=chardonnay.bothyr)
+}
+# Now summarize the results in one table!
+generate.p.tables.aov(rep.aov)
+
+
+library(kableExtra)
+library(magick)
+jpeg(file="C:/Users/Shannon/Documents/STAT_550/Project_grapevine")
+kable(generate.p.tables.aov(rep.aov), "latex") %>%
+  as_image()
+dev.off()
+
+```
 
 
 
