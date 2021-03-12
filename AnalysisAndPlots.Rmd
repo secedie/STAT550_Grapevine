@@ -3,6 +3,8 @@ title: "AnalysisAndPlots"
 author: "Naitong Chen, Shirley Cui, Shannon Edie"
 date: "3/10/2021"
 output: word_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r setup}
@@ -1018,9 +1020,12 @@ for (i in colnames(chardonnay2020[-1:-5])){
 ## Merlot 2019
 
 ```{r}
-for (i in colnames(merlot2019[c(-1:-5,-7)])){ # excluded veraison 
-  print(i)
-  print(power(merlot2019, i))
+
+power.merlot2019 <- vector("numeric", length(colnames(merlot2019[c(-1:-5,-7)])))
+for (i in 1:length(colnames(merlot2019[c(-1:-5,-7)]))){ # excluded veraison 
+  print(colnames(merlot2019[c(-1:-5,-7)])[i])
+  print(power(merlot2019, colnames(merlot2019[c(-1:-5,-7)])[i]))
+  power.merlot2019[i] <- power(merlot2019, colnames(merlot2019[c(-1:-5,-7)])[i])
 }
 ```
 
@@ -1032,5 +1037,35 @@ for (i in colnames(mer2020mice1[-1:-5])){
   print(i)
   print(power(mer2020mice1, i))
 }
+```
+
+```{r}
+
+# Consider how power is influenced by the 
+power.adjust=function(data, resp, fa, fb){
+  pwr.2way(a=length(unique(data[["block"]])), 
+           b=length(unique(data[["treatment"]])), 
+           alpha=0.05, 
+           size.A=nrow(data %>% filter(block == 1)), 
+           size.B=nrow(data %>% filter(treatment=="heat")),
+           f.A=fa, 
+           f.B=fb)
+}
+
+power.plot <- expand.grid("Trt_effect"=seq(0,1,0.05),
+                         "Block_effect"=seq(0,1,0.05))
+power.plot$power.A <- unlist(apply(power.plot, 1, function(x){power.adjust(merlot2020, "SPAD", fa=x[1], fb=x[2])$power.A}))
+power.plot$power.B <- unlist(apply(power.plot, 1, function(x){power.adjust(merlot2020, "SPAD", fa=x[1], fb=x[2])$power.B}))
+power.plot$power <- unlist(apply(power.plot, 1, function(x){min(x[3], x[4])}))
+  
+contour(as.matrix(dcast(power.plot, Trt_effect ~ Block_effect, value.var="power.A")),
+        nlevels=10, col=colorRampPalette(c("red", "blue"))(11),
+        xlab="Block effect", ylab="Treatment effect", main="Power for treatment effect")
+contour(as.matrix(dcast(power.plot, Trt_effect ~ Block_effect, value.var="power.B")),
+        nlevels=10, col=colorRampPalette(c("red", "blue"))(11),
+        xlab="Block effect", ylab="Treatment effect", main="Power for block effect")
+contour(as.matrix(dcast(power.plot, Trt_effect ~ Block_effect, value.var="power")),
+        nlevels=10, col=colorRampPalette(c("red", "blue"))(11),
+        xlab="Block effect", ylab="Treatment effect", main="Power of two-way ANOVA")
 ```
 

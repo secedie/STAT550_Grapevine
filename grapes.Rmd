@@ -1034,11 +1034,11 @@ icen.mer20 <- with(merlot2020, {
 library(icenReg)
 # Build a model for the bloom data
 coxph.bloom20 <- ic_sp(cbind(bloom.start,bloom.end) ~  as.factor(trt) * as.factor(block),
-               data=icen.mer20, model='ph', bs_samples=500)
+               data=icen.mer20, model='ph', bs_samples=100)
 
 # Build a model for the veraison data
 coxph.ver20 <- ic_sp(cbind(verais.start,verais.end) ~  as.factor(trt) * as.factor(block),
-               data=icen.mer20, model='ph', bs_samples=500)
+               data=icen.mer20, model='ph', bs_samples=100)
 
 
 ```
@@ -1739,6 +1739,7 @@ kable(char20.test.ptab[[2]], caption="\\label{ptab.char20.anova} Individual ANOV
 # First, let's combine the merlot2019 and merlot2020 datasets
 merlot2019$year <- 2019
 merlot2020mice$year <- 2020
+merlot.bothyr <- rbind.fill(merlot2019, complete(merlot2020mice, 1))
 
 names(merlot.bothyr)[[1]] <- "Key"
 
@@ -1750,17 +1751,76 @@ chardonnay.bothyr <- rbind.fill(chardonnay2019, chardonnay2020)
 
 ```{r}
 
-# Repeated-measures ANOVA
+# This function takes a list of repeated-measures aov objects and
+# summarizes the p-values in a coherent table
+generate.p.tables.aov <- function(x){
+  
+  # First, for each test, extract just the coefficients and their significances
+  ww <- lapply(x, function(t){as.data.frame(unclass(summary(t)[[1]]))})
+  
+  # Now for each table, add in variables indicating the variable we are looking at
+  # in the test, as well as the covariate that the row is talking about
+  ww <- lapply(1:length(ww), 
+                      function(t,xx=ww){cbind(xx[[t]][1:3,], 
+                                        data.frame("Var"=rep(names(xx)[t],3),
+                                                   "Covar"=rownames(xx[[t]])[1:3]))})
+  # Bind all of the results for the tests together into one large data frame
+  ww <- do.call(rbind.data.frame, ww)
+
+  # Create a table that indicates p-values
+  ww.ptab <- dcast(ww, Var~Covar, value.var="Pr..F.")
+  # Round to three decimal places to clean up the table
+  ww.ptab[,c(2:4)] <- round(ww.ptab[,c(2:4)], 3)
+  return(ww.ptab)
+}
+
+```
+
+
+```{r}
+
+# Repeated-measures ANOVA for the merlot dataset
 merlot.variables <- c("SPAD", "cluster.number", "yield", "cluster.weight",
                       "berries.cluster", "berry.weight")
 merlot.imputed.vars <- c("berry.TA", "berry.pH", "berry.Brix")
+merlot.variables <- c(merlot.variables, merlot.imputed.vars)
 
-for (var in merlot.variables) {
+rep.aov <- vector("list", length=length(merlot.variables))
+names(rep.aov) <- merlot.variables
+for (i in 1:length(merlot.variables)) {
   # Repeated-measures ANOVA
-  rep.aov <- aov(eval(deparse(text=var)) ~ block*treatment + 
+  rep.aov[[i]] <- aov(eval(parse(text=merlot.variables[i])) ~ block*treatment + 
                    year*treatment + Error(Key), 
             data=merlot.bothyr)
 }
+# Now summarize the results in one table!
+generate.p.tables.aov(rep.aov)
+
+```
+
+```{r}
+
+
+# Repeated-measures ANOVA for the merlot dataset
+chardonnay.variables <- c("X..of.clusters", "yield..kg.", "av.cluster.weight..kg.")
+
+rep.aov <- vector("list", length=length(chardonnay.variables))
+names(rep.aov) <- chardonnay.variables
+for (i in 1:length(chardonnay.variables)) {
+  # Repeated-measures ANOVA
+  rep.aov[[i]] <- aov(eval(parse(text=chardonnay.variables[i])) ~ block*treatment + 
+                   year*treatment + Error(ï..sample.ID), 
+            data=chardonnay.bothyr)
+}
+# Now summarize the results in one table!
+generate.p.tables.aov(rep.aov)
+
+
+library(kableExtra)
+library(magick)
+jpeg(file="C:/Users/Shannon/Documents/STAT_550/Project_grapevine")
+kable(generate.p.tables.aov(rep.aov), "latex") %>%
+  as_image()
 
 ```
 
