@@ -4,7 +4,7 @@ Pdf report: (TO BE ADDED)
 
 ## Analysis code
 
-Exploratory data analysis: [here](Exploratory Data Analysis.Rmd)
+Exploratory data analysis: [here](exploratory_data_analysis.Rmd)
 
 Censored data analysis: (TO BE ADDED)
 
