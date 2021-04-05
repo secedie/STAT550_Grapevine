@@ -1,8 +1,8 @@
-# Agro-thermal Heat Treatment on Grapevine
+## Agro-thermal Heat Treatment on Grapevine
 
 Pdf report: (TO BE ADDED)
 
-Analysis code is divided into three Rmd files below.
+## Analysis code
 
 Exploratory data analysis: [Exploratory Data Analysis.Rmd](here)
 
