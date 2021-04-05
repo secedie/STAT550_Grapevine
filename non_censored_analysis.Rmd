@@ -1,0 +1,680 @@
+---
+title: "non_censored_analysis"
+author: "Naitong Chen, Shirley Cui, Shannon Edie"
+date: "4/5/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r read.data.in, results='hide', warning=FALSE}
+chardonnay2019 = read.csv("TanjaVoegel_Chardonnay_2019_data.csv")
+chardonnay2020 = read.csv("TanjaVoegel_Chardonnay_2020_data.csv")
+merlot2019 = read.csv("TanjaVoegel_Merlot_2019_data.csv")
+merlot2020 = read.csv("TanjaVoegel_Merlot_2020_data.csv")
+addition2021 = read.csv("data addition March 8 2021.csv")
+
+# removing extra columns
+merlot2020 = merlot2020[-(61:65),]
+merlot2020 = merlot2020[,-(19:20)]
+merlot2019 = merlot2019[-(61:65),]
+merlot2019 = merlot2019[,-18]
+
+# Make sure the merlot column names are consistent
+colnames(merlot2020)[colnames(merlot2020)=="spad"] = "SPAD"
+
+# filling in zero for yield related entries
+merlot2020$yield[is.na(merlot2020$yield)] = 0
+merlot2020$cluster.weight[is.na(merlot2020$cluster.weight)] = 0
+merlot2020$berries.cluster[is.na(merlot2020$berries.cluster)] = 0
+merlot2020$berry.weight[is.na(merlot2020$berry.weight)] = 0
+merlot2020$cluster.number[is.na(merlot2020$cluster.number)] = 0
+
+# encode row, treatment, block, and subsample as factor
+chardonnay2019$row = as.factor(chardonnay2019$row)
+chardonnay2019$treatment = as.factor(chardonnay2019$treatment)
+chardonnay2019$block = as.factor(chardonnay2019$block)
+chardonnay2019$subsample = as.factor(chardonnay2019$subsample)
+
+chardonnay2020$row = as.factor(chardonnay2020$row)
+chardonnay2020$treatment = as.factor(chardonnay2020$treatment)
+chardonnay2020$block = as.factor(chardonnay2020$block)
+chardonnay2020$subsample = as.factor(chardonnay2020$subsample)
+
+merlot2019$row = as.factor(merlot2019$row)
+merlot2019$treatment = as.factor(merlot2019$treatment)
+merlot2019$block = as.factor(merlot2019$block)
+merlot2019$subsample = as.factor(merlot2019$subsample)
+
+
+merlot2020$row = as.factor(merlot2020$row)
+merlot2020$treatment = as.factor(merlot2020$treatment)
+merlot2020$block = as.factor(merlot2020$block)
+merlot2020$subsample = as.factor(merlot2020$subsample)
+
+library(plyr)
+# Add in the additional data
+names(merlot2020)[1] <- "Key"
+merlot2020 <- join(merlot2020, addition2021)
+
+# detach plyr as it creates conflict with tidyverse
+detach(package:plyr)
+# remove unused dataset
+remove(addition2021)
+```
+
+```{r load.packages, echo=F, results='hide'}
+library(tidyverse)
+library(ggpubr) 
+library(corrplot)
+library(icenReg) # for survival analysis
+library(knitr)
+library(lawstat) # for the levene test
+library(mice)
+library(miceadds)
+library(MKinfer)
+library(rstatix) # for the repeated-measures ANOVA
+library(ARTool) # for aligned rank transform
+library(maditr) # for dcast
+library(pwr2)
+library(kableExtra)
+library(magick)
+library(car)
+detach(package:car)
+```
+
+With the data loaded, we first conduct complete case analysis (ignoring missing data). We begin by checking the equal variance assumptions. The normality assumption will be checked once we get the residuals from the fitted ANOVA models. Note that the Levene test is less sensitive to violations of the normality assumption.
+
+```{r chardonnay2019.variance.check}
+resp.char19 <- colnames(chardonnay2019)[-c(1:5)]
+homosc.table.char19 <- array(data=NA, dim=c(length(resp.char19), 2))
+dimnames(homosc.table.char19)[[2]] <- c("Bartlett", "Levene")
+dimnames(homosc.table.char19)[[1]] <- resp.char19
+
+for (i in 1:length(resp.char19)) {
+  # the lapply function simply extracts the p-value from each outputted run of the MICE data
+  bart.p <- with(chardonnay2019, 
+                               bartlett.test(eval(parse(text=resp.char19[i])) ~ paste(treatment, block)))$p.value
+  lev.p  <- with(chardonnay2019, 
+                        levene.test(eval(parse(text=resp.char19[i])), paste(treatment, block)))$p.value
+  homosc.table.char19[i,1] <- bart.p
+  homosc.table.char19[i,2] <- lev.p
+}
+
+for (i in 1:length(resp.char19)) {
+  boxplot(chardonnay2019[[resp.char19[i]]] ~ chardonnay2019$treatment + chardonnay2019$block,
+        xlab="Treatment + Block")
+}
+
+homosc.table.char19
+```
+
+```{r chardonnay2020.variance.check}
+resp.char20 <- colnames(chardonnay2020)[-c(1:5)]
+homosc.table.char20 <- array(data=NA, dim=c(length(resp.char20), 2))
+dimnames(homosc.table.char20)[[2]] <- c("Bartlett", "Levene")
+dimnames(homosc.table.char20)[[1]] <- resp.char19
+
+for (i in 1:length(resp.char20)) {
+
+  # the lapply function simply extracts the p-value from each outputted run of the MICE data
+  bart.p <- with(chardonnay2020, 
+                               bartlett.test(eval(parse(text=resp.char20[i])) ~ paste(treatment, block)))$p.value
+  lev.p  <- with(chardonnay2020, 
+                        levene.test(eval(parse(text=resp.char20[i])), paste(treatment, block)))$p.value
+  homosc.table.char20[i,1] <- bart.p
+  homosc.table.char20[i,2] <- lev.p
+}
+
+for (i in 1:length(resp.char20)) {
+  boxplot(chardonnay2020[[resp.char20[i]]] ~ chardonnay2020$treatment + chardonnay2020$block,
+        xlab="Treatment + Block")
+}
+
+homosc.table.char20
+```
+
+```{r merlot2019.variance.check}
+resp.mer19 <- colnames(merlot2019)[-c(1:5, 7)]
+# Create some tables to save the results of our statistical tests in
+homosc.table.mer19 <- array(data=NA, dim=c(length(resp.mer19), 2))
+dimnames(homosc.table.mer19)[[2]] <- c("Bartlett", "Levene")
+dimnames(homosc.table.mer19)[[1]] <- resp.mer19
+
+# Compare variances for each unique treatment-block group
+for (i in 1:length(resp.mer19)) {
+
+  # the lapply function simply extracts the p-value from each outputted run of the MICE data
+  bart.p <- (with(merlot2019,
+                        bartlett.test(eval(parse(text=resp.mer19[i])) ~ paste(treatment, block)))$p.value)
+  lev.p  <- (with(merlot2019,
+                        levene.test(eval(parse(text=resp.mer19[i])), paste(treatment, block)))$p.value)
+  homosc.table.mer19[i,1] <- bart.p
+  homosc.table.mer19[i,2] <- lev.p
+}
+
+for (i in 1:length(resp.mer19)) {
+  boxplot(merlot2019[[resp.mer19[i]]] ~ merlot2019$treatment + merlot2019$block,
+        xlab="Treatment + Block")
+}
+
+homosc.table.mer19
+```
+
+```{r merlot2020.variance.check}
+resp.mer20 <- colnames(merlot2020)[-c(1:5, 7,9)]
+# Create some tables to save the results of our statistical tests in
+homosc.table.mer20 <- array(data=NA, dim=c(length(resp.mer20), 2))
+dimnames(homosc.table.mer20)[[2]] <- c("Bartlett", "Levene")
+dimnames(homosc.table.mer20)[[1]] <- resp.mer20
+
+# Compare variances for each unique treatment-block group
+for (i in 1:length(resp.mer20)) {
+
+  # the lapply function simply extracts the p-value from each outputted run of the MICE data
+  bart.p <- (with(merlot2020,
+                        bartlett.test(eval(parse(text=resp.mer20[i])) ~ paste(treatment, block)))$p.value)
+  lev.p  <- (with(merlot2020,
+                        levene.test(eval(parse(text=resp.mer20[i])), paste(treatment, block)))$p.value)
+  homosc.table.mer20[i,1] <- bart.p
+  homosc.table.mer20[i,2] <- lev.p
+}
+
+for (i in 1:length(resp.mer20)) {
+  boxplot(merlot2020[[resp.mer20[i]]] ~ merlot2020$treatment + merlot2020$block,
+        xlab="Treatment + Block")
+}
+
+homosc.table.mer20
+```
+
+From above we see that the Levene tests do not show much major deviations from the equal variance assumptions. Bartlett tests results may not be so reliable here as with so few observations, we can easily violate the normality assumption. However, they serve as a good reference for comparions nonetheless. We now fit the two-way ANOVA models for response. As the same time, we show the distribution of the residuals and construct the 95% C.I. for the difference in treatment effects.
+
+```{r two.way.anova.chardonnay2019}
+resps = colnames(chardonnay2019)[6:8]
+
+for (i in 1:length(resps)) {
+  print(resps[i])
+  options(contrasts = c("contr.sum", "contr.poly"))
+  resres = aov(eval(parse(text=resps[i])) ~ treatment * block, data=chardonnay2019)
+
+  plot(resres$residuals)
+  qqnorm(resres$residuals)
+  qqline(resres$residuals)
+  
+  options(contrasts = c("contr.sum", "contr.poly"))
+  library(car)
+  resresres = Anova(resres, type = "III")
+  print(resresres)
+  
+  print(tukey_hsd(resres, which="treatment"))
+}
+```
+
+```{r two.way.anova.chardonnay2020}
+resps = colnames(chardonnay2020)[6:8]
+
+for (i in 1:length(resps)) {
+  print(resps[i])
+  options(contrasts = c("contr.sum", "contr.poly"))
+  resres = aov(eval(parse(text=resps[i])) ~ treatment * block, data=chardonnay2020)
+
+  plot(resres$residuals)
+  qqnorm(resres$residuals)
+  qqline(resres$residuals)
+  
+  options(contrasts = c("contr.sum", "contr.poly"))
+  library(car)
+  resresres = Anova(resres, type = "III")
+  print(resresres)
+  
+  print(tukey_hsd(resres, which="treatment"))
+}
+```
+
+```{r two.way.anova.merlot2019}
+resps = resp.mer19
+
+for (i in 1:length(resps)) {
+  print(resps[i])
+  options(contrasts = c("contr.sum", "contr.poly"))
+  resres = aov(eval(parse(text=resps[i])) ~ treatment * block, data=merlot2019)
+  
+  plot(resres$residuals)
+  qqnorm(resres$residuals)
+  qqline(resres$residuals)
+
+  options(contrasts = c("contr.sum", "contr.poly"))
+  library(car)
+  resresres = Anova(resres, type = "III")
+  print(resresres)
+  
+  print(tukey_hsd(resres, which="treatment")) 
+}
+```
+
+```{r two.way.anova.merlot2020}
+resps = names(merlot2020)[c(6,8,c(10:18))]
+
+for (i in 1:length(resps)) {
+  print(resps[i])
+  options(contrasts = c("contr.sum", "contr.poly"))
+  resres = aov(eval(parse(text=resps[i])) ~ treatment * block, data=merlot2020)
+  
+  plot(resres$residuals)
+  qqnorm(resres$residuals)
+  qqline(resres$residuals)
+  
+  options(contrasts = c("contr.sum", "contr.poly"))
+  library(car)
+  resresres = Anova(resres, type = "III")
+  print(resresres)
+  
+  print(tukey_hsd(resres, which="treatment")) 
+}
+```
+
+```{r two.way.merlot2020.pruning.weight.ravaz.index}
+block12_removed = merlot2020[which(merlot2020$block != "1" & merlot2020$block != "2"),]
+
+print("pruning.weight")
+options(contrasts = c("contr.sum", "contr.poly"))
+resres = aov(pruning.weight ~ treatment * block, data=block12_removed)
+
+plot(resres$residuals)
+qqnorm(resres$residuals)
+qqline(resres$residuals)
+
+options(contrasts = c("contr.sum", "contr.poly"))
+library(car)
+resresres = Anova(resres, type = "III")
+print(resresres)
+
+print(tukey_hsd(resres, which="treatment"))
+
+print("Ravaz.index")
+options(contrasts = c("contr.sum", "contr.poly"))
+resres = aov(Ravaz.index ~ treatment * block, data=block12_removed)
+
+plot(resres$residuals)
+qqnorm(resres$residuals)
+qqline(resres$residuals)
+
+options(contrasts = c("contr.sum", "contr.poly"))
+library(car)
+resresres = Anova(resres, type = "III")
+print(resresres)
+
+print(tukey_hsd(resres, which="treatment"))
+```
+
+From above we see some of the normality assumptions are clearly violated. Again because we don't have many observations, it is difficult to tell whether the outliers causing these violations are part of the natual variation of the population. Therefore, instead of removing them, we run an alternative non-parametric model. Note that this only works for data without missing values. We will deal with those after the following non-paremetric tests.
+
+```{r get.response.names}
+resp.char19 <- colnames(chardonnay2019)[-c(1:5)]
+resp.char20 <- colnames(chardonnay2020)[-c(1:5)]
+# excluding veraison
+resp.mer19 <- colnames(merlot2019)[-c(1:5, 7)]
+# remove veraison and bloom
+resp.mer20 <- colnames(merlot2020)[-c(1:5, 7,9)]
+# responses with missing values
+resp.mer20.miss <- resp.mer20[c(8:13)]
+```
+
+```{r art.anova.chardonnay2019}
+resps = colnames(chardonnay2019)[6:8]
+for (i in 1:length(resps)) {
+  print(resps[i])
+  
+  model = art(eval(parse(text=resps[i])) ~ treatment * block, chardonnay2019)
+  res = anova(model, type = 3)
+  print(res)
+}
+```
+
+```{r art.anova.chardonnay2020}
+resps = colnames(chardonnay2020)[6:8]
+for (i in 1:length(resps)) {
+  print(resps[i])
+  
+  model = art(eval(parse(text=resps[i])) ~ treatment * block, chardonnay2020)
+  res = anova(model, type = 3)
+  print(res)
+}
+```
+
+```{r art.anova.merlot2019}
+resps = resp.mer19
+for (i in 1:length(resps)) {
+  print(resps[i])
+  
+  model = art(eval(parse(text=resps[i])) ~ treatment * block, merlot2019)
+  res = anova(model, type = 3)
+  print(res)
+}
+```
+
+```{r art.anova.merlot2020}
+resps = resp.mer20[1:7]
+for (i in 1:length(resps)) {
+  print(resps[i])
+  
+  model = art(eval(parse(text=resps[i])) ~ treatment * block, merlot2020)
+  res = anova(model, type = 3)
+  print(res)
+}
+```
+
+These non-parametric results serve as a reference to check how sensitive the results are to the assumptions required in the two-way ANOVA models. We now address the missing data in the two merlot datasets. (Veraison and bloom as censored data will be treated in the censored analysis file)
+
+```{r missing.rate.merlot2019}
+table <- array(data=NA, dim=c(1,1))
+rownames(table) <- c("veraison")
+table[1,1] = paste0(round(mean(is.na(merlot2019$veraison)), 3)*100, "%")
+
+print(table)
+```
+
+```{r missing.rate.merlot2020}
+table <- array(data=NA, dim=c(1,7))
+colnames(table) <- c("bloom", "veraison", "yield related measures", "berry quality related measures", 
+                      "brown seed color", "pruning weight", "Ravaz index")
+table[1,1] = paste0(round(mean(is.na(merlot2020$bloom)), 3)*100, "%")
+table[1,2] = paste0(round(mean(is.na(merlot2020$veraison)), 3)*100, "%")
+table[1,3] = paste0(round(mean(is.na(merlot2020$yield)), 3)*100, "%")
+table[1,4] = paste0(round(mean(is.na(merlot2020$berry.Brix)), 3)*100, "%")
+table[1,5] = paste0(round(mean(is.na(merlot2020$pruning.weight)), 3)*100, "%")
+table[1,6] = paste0(round(mean(is.na(merlot2020$brown.seed.color)), 3)*100, "%")
+table[1,7] = paste0(round(mean(is.na(merlot2020$Ravaz.index)), 3)*100, "%")
+
+print(table)
+```
+
+We use multiple imputaion below to construct five imputed datasets for each response.
+
+```{r multiple.imputation}
+# filling in zero for yield related entries
+merlot2020$yield[is.na(merlot2020$yield)] = 0
+merlot2020$cluster.weight[is.na(merlot2020$cluster.weight)] = 0
+merlot2020$berries.cluster[is.na(merlot2020$berries.cluster)] = 0
+merlot2020$berry.weight[is.na(merlot2020$berry.weight)] = 0
+merlot2020$cluster.number[is.na(merlot2020$cluster.number)] = 0
+
+# imputation for merlot2020 using all responses (excluding key, row and subsample)
+predMatrix = matrix(rep(1,ncol(merlot2020)^2), ncol(merlot2020), ncol(merlot2020))
+diag(predMatrix) = 0
+predMatrix[,1] = 0
+predMatrix[,4] = 0
+predMatrix[,5] = 0
+merlot2020mice = mice(data = merlot2020, predictorMatrix = predMatrix, seed = 1, method = "norm.predict")
+```
+
+We now can run both the ANOVA and ART ANOVA models and pool the results together to obtain a new set of p-values. Again, these serve as references for checking how sensitive the complete case analyses are to the missing values.
+
+```{r pooled.art.anova.merlot2020}
+# make tables that will hold the p-values
+resps = resp.mer20[8:13]
+resp.mer20.miss = resp.mer20[8:13]
+mer.2020.sig.miss.anova <- array(data=rep(0, length(resp.mer20.miss) * 3), dim=c(length(resp.mer20.miss), 3))
+dimnames(mer.2020.sig.miss.anova)[[2]] <- c("treatment", "block", "interaction")
+dimnames(mer.2020.sig.miss.anova)[[1]] <- resp.mer20.miss
+mer.2020.sig.miss.art <- array(data=rep(0, length(resp.mer20.miss) * 3), dim=c(length(resp.mer20.miss), 3))
+dimnames(mer.2020.sig.miss.art)[[2]] <- c("treatment", "block", "interaction")
+dimnames(mer.2020.sig.miss.art)[[1]] <- resp.mer20.miss
+
+for (i in 1:length(resps)) {
+  print(resps[i])
+  
+  model_string = paste(resps[i], "~ treatment * block", sep=" ")
+  res = mi.anova(merlot2020mice, model_string, type = 3)
+  p.val = res$anova.table[["Pr(>F)"]][c(1:3)]
+  mer.2020.sig.miss.anova[i,] = round(p.val,2)
+  
+  d1 = complete(merlot2020mice, 1)
+  d2 = complete(merlot2020mice, 2)
+  d3 = complete(merlot2020mice, 3)
+  d4 = complete(merlot2020mice, 4)
+  d5 = complete(merlot2020mice, 5)
+  
+  res1 = anova(art(eval(parse(text=resps[i])) ~ treatment * block, data = d1), type = 2)
+  res2 = anova(art(eval(parse(text=resps[i])) ~ treatment * block, data = d2), type = 2)
+  res3 = anova(art(eval(parse(text=resps[i])) ~ treatment * block, data = d3), type = 2)
+  res4 = anova(art(eval(parse(text=resps[i])) ~ treatment * block, data = d4), type = 2)
+  res5 = anova(art(eval(parse(text=resps[i])) ~ treatment * block, data = d5), type = 2)
+  
+  for (j in 1:3){
+    fval = c(
+      res1[["F value"]][j],
+      res2[["F value"]][j],
+      res3[["F value"]][j],
+      res4[["F value"]][j],
+      res5[["F value"]][j]
+    )
+    comb.p = micombine.F(fval, res1[["Df"]][j])
+    mer.2020.sig.miss.art[i,j] = round(comb.p[["p"]],2)
+  }
+}
+
+# results are summarized in these two tables (see R Console output)
+print(mer.2020.sig.miss.anova)
+print(mer.2020.sig.miss.art)
+```
+
+We now combine both years together by introducing year as a third factor.
+
+```{r three.way.anova.chardonnay}
+chardonnay2019$year <- 2019
+chardonnay2020$year <- 2020
+chardonnay2019$year <- as.factor(chardonnay2019$year)
+chardonnay2020$year <- as.factor(chardonnay2020$year)
+chardonnay.bothyr <- rbind(chardonnay2019, chardonnay2020)
+names(chardonnay.bothyr)[[1]] <- "Key"
+chardonnay.bothyr$Key <- as.factor(chardonnay.bothyr$Key)
+
+for (i in c(6:8)) {
+  print(names(chardonnay.bothyr)[i])
+  res = aov(eval(parse(text=names(chardonnay.bothyr)[i])) ~ block*treatment*year,
+            data=chardonnay.bothyr)
+  resres = Anova(res, type = "III")
+  print(resres)
+
+  print(tukey_hsd(res, which="treatment"))
+  
+  res.art = anova(art(eval(parse(text=names(chardonnay.bothyr)[i])) ~ treatment * block * year, 
+                  data = chardonnay.bothyr), type = 3)
+  print(res.art)
+}
+```
+
+```{r three.way.anova.merlot}
+merlot2019$year <- 2019
+merlot2020$year <- 2020
+merlot2019$year <- as.factor(merlot2019$year)
+merlot2020$year <- as.factor(merlot2020$year)
+names(merlot2019)[[1]] <- "Key"
+merlot.bothyr <- rbind(merlot2019[,c(1:6, 8:18)], merlot2020[,c(1:5,8, 10:17, 19:21)])
+merlot.bothyr[117,1] <- "M57"
+merlot.bothyr$Key <- as.factor(merlot.bothyr$Key)
+
+for (i in c(6:16)) {
+  print(names(merlot.bothyr)[i])
+}
+
+for (i in c(6:16)) {
+  print(names(merlot.bothyr)[i])
+  dat = merlot.bothyr[,c(1:3,i,17)]
+  inds = which(is.na(merlot.bothyr[,i]))
+  if (length(inds) > 0) {
+    inds.m60 = inds - 60 
+    dat = dat[-c(inds, inds.m60),]
+    if (i == 15 | i == 16) {
+      dat = dat[-which(dat$block == 2),]
+    }
+  }
+  options(contrasts = c("contr.sum", "contr.poly"))
+  res = aov(eval(parse(text=names(merlot.bothyr)[i])) ~ block*treatment*year, data=dat)
+  resres = Anova(res, type = "III")
+  print(resres)
+  
+  print(tukey_hsd(res, which="treatment"))
+}
+```
+
+Again as a comparison, we run the non-parametric version of the test (on responses without missing data). Missing data again is treated afterwards.
+
+```{r three.way.art.chardonnay}
+for (i in c(6:8)) {
+  print(names(chardonnay.bothyr)[i])
+  res.art = anova(art(eval(parse(text=names(chardonnay.bothyr)[i])) ~ treatment * block * year, 
+                  data = chardonnay.bothyr), type = 3)
+  print(res.art)
+}
+```
+
+```{r three.way.art.merlot}
+for (i in c(6:11)) {
+  print(names(merlot.bothyr)[i])
+  dat = merlot.bothyr[,c(1:3,i,17)]
+  options(contrasts = c("contr.sum", "contr.poly"))
+  res.art = anova(art(eval(parse(text=names(merlot.bothyr)[i])) ~ treatment * block * year, 
+                  data = merlot.bothyr), type = 3)
+  print(res.art)
+}
+```
+
+Finally, we address the missing data the same way as we did before and check both the results from parametric and non-parametric models.
+
+```{r get.combined.datasets.ready}
+merlot2019$year <- 2019
+    complete_merlot2020_1 = complete(merlot2020mice, 1)
+    complete_merlot2020_1$year <- 2020
+    merlot2019$year <- as.factor(merlot2019$year)
+    complete_merlot2020_1$year <- as.factor(complete_merlot2020_1$year)
+    names(merlot2019)[[1]] <- "Key"
+    merlot.bothyr.1 <- rbind(merlot2019[,c(1:6, 8:18)], complete_merlot2020_1[,c(1:5,8, 10:17, 19:21)])
+    merlot.bothyr.1[117,1] <- "M57"
+    merlot.bothyr.1$Key <- as.factor(merlot.bothyr.1$Key)
+    
+    merlot2019$year <- 2019
+    complete_merlot2020_2 = complete(merlot2020mice, 2)
+    complete_merlot2020_2$year <- 2020
+    merlot2019$year <- as.factor(merlot2019$year)
+    complete_merlot2020_2$year <- as.factor(complete_merlot2020_2$year)
+    names(merlot2019)[[1]] <- "Key"
+    merlot.bothyr.2 <- rbind(merlot2019[,c(1:6, 8:18)], complete_merlot2020_2[,c(1:5,8, 10:17, 19:21)])
+    merlot.bothyr.2[117,1] <- "M57"
+    merlot.bothyr.2$Key <- as.factor(merlot.bothyr.2$Key)
+    
+    merlot2019$year <- 2019
+    complete_merlot2020_3 = complete(merlot2020mice, 3)
+    complete_merlot2020_3$year <- 2020
+    merlot2019$year <- as.factor(merlot2019$year)
+    complete_merlot2020_3$year <- as.factor(complete_merlot2020_3$year)
+    names(merlot2019)[[1]] <- "Key"
+    merlot.bothyr.3 <- rbind(merlot2019[,c(1:6, 8:18)], complete_merlot2020_3[,c(1:5,8, 10:17, 19:21)])
+    merlot.bothyr.3[117,1] <- "M57"
+    merlot.bothyr.3$Key <- as.factor(merlot.bothyr.3$Key)
+    
+    merlot2019$year <- 2019
+    complete_merlot2020_4 = complete(merlot2020mice, 4)
+    complete_merlot2020_4$year <- 2020
+    merlot2019$year <- as.factor(merlot2019$year)
+    complete_merlot2020_4$year <- as.factor(complete_merlot2020_4$year)
+    names(merlot2019)[[1]] <- "Key"
+    merlot.bothyr.4 <- rbind(merlot2019[,c(1:6, 8:18)], complete_merlot2020_4[,c(1:5,8, 10:17, 19:21)])
+    merlot.bothyr.4[117,1] <- "M57"
+    merlot.bothyr.4$Key <- as.factor(merlot.bothyr.4$Key)
+    
+    merlot2019$year <- 2019
+    complete_merlot2020_5 = complete(merlot2020mice, 5)
+    complete_merlot2020_5$year <- 2020
+    merlot2019$year <- as.factor(merlot2019$year)
+    complete_merlot2020_5$year <- as.factor(complete_merlot2020_5$year)
+    names(merlot2019)[[1]] <- "Key"
+    merlot.bothyr.5 <- rbind(merlot2019[,c(1:6, 8:18)], complete_merlot2020_5[,c(1:5,8, 10:17, 19:21)])
+    merlot.bothyr.5[117,1] <- "M57"
+    merlot.bothyr.5$Key <- as.factor(merlot.bothyr.5$Key)
+```
+
+```{r table.for.three.way.merlot.missing}
+# make tables that will hold the p-values
+resp.mer20.miss = names(merlot.bothyr)[12:16]
+mer.2020.sig.miss.anova <- array(data=rep(0, length(resp.mer20.miss) * 3), dim=c(length(resp.mer20.miss), 3))
+dimnames(mer.2020.sig.miss.anova)[[2]] <- c("treatment", "block", "interaction")
+dimnames(mer.2020.sig.miss.anova)[[1]] <- resp.mer20.miss
+mer.2020.sig.miss.art <- array(data=rep(0, length(resp.mer20.miss) * 3), dim=c(length(resp.mer20.miss), 3))
+dimnames(mer.2020.sig.miss.art)[[2]] <- c("treatment", "block", "interaction")
+dimnames(mer.2020.sig.miss.art)[[1]] <- resp.mer20.miss
+```
+
+```{r pooled.three.way.merlot}
+  for (i in c(12:16)) {
+    print(names(merlot.bothyr)[i])
+    dat.1 = merlot.bothyr.1[,c(1:3,i,17)]
+    dat.2 = merlot.bothyr.2[,c(1:3,i,17)]
+    dat.3 = merlot.bothyr.3[,c(1:3,i,17)]
+    dat.4 = merlot.bothyr.4[,c(1:3,i,17)]
+    dat.5 = merlot.bothyr.5[,c(1:3,i,17)]
+
+    options(contrasts = c("contr.sum", "contr.poly"))
+    res1 = anova(art(eval(parse(text=names(merlot.bothyr)[i])) ~ treatment * block * year, 
+                  data = dat.1), type = 3)
+    res2 = anova(art(eval(parse(text=names(merlot.bothyr)[i])) ~ treatment * block * year, 
+                  data = dat.2), type = 3)
+    res3 = anova(art(eval(parse(text=names(merlot.bothyr)[i])) ~ treatment * block * year, 
+                  data = dat.3), type = 3)
+    res4 = anova(art(eval(parse(text=names(merlot.bothyr)[i])) ~ treatment * block * year, 
+                  data = dat.4), type = 3)
+    res5 = anova(art(eval(parse(text=names(merlot.bothyr)[i])) ~ treatment * block * year, 
+                  data = dat.5), type = 3)
+
+    for (j in c(1,2,4)){
+      fval = c(
+        res1[["F value"]][j],
+        res2[["F value"]][j],
+        res3[["F value"]][j],
+        res4[["F value"]][j],
+        res5[["F value"]][j]
+      )
+      comb.p = micombine.F(fval, res1[["Df"]][j])
+      if (j == 4) {
+        mer.2020.sig.miss.art[i-11,j-1] = round(comb.p[["p"]],2) 
+      } else {
+        mer.2020.sig.miss.art[i-11,j] = round(comb.p[["p"]],2) 
+      }
+    }
+    
+    options(contrasts = c("contr.sum", "contr.poly"))
+    res1 = aov(eval(parse(text=names(merlot.bothyr)[i])) ~ treatment * block * year, 
+                  data = dat.1)
+    res2 = aov(eval(parse(text=names(merlot.bothyr)[i])) ~ treatment * block * year, 
+                  data = dat.2)
+    res3 = aov(eval(parse(text=names(merlot.bothyr)[i])) ~ treatment * block * year, 
+                  data = dat.3)
+    res4 = aov(eval(parse(text=names(merlot.bothyr)[i])) ~ treatment * block * year, 
+                  data = dat.4)
+    res5 = aov(eval(parse(text=names(merlot.bothyr)[i])) ~ treatment * block * year, 
+                  data = dat.5)
+               
+    for (j in c(1,2,4)){
+      fval = c(
+        summary(res1)[[1]][["F value"]][j],
+        summary(res2)[[1]][["F value"]][j],
+        summary(res3)[[1]][["F value"]][j],
+        summary(res4)[[1]][["F value"]][j],
+        summary(res5)[[1]][["F value"]][j]
+      )
+      comb.p = micombine.F(fval, summary(res1)[[1]][["Df"]][j])
+      if (j == 4) {
+        mer.2020.sig.miss.anova[i-11,j-1] = round(comb.p[["p"]],2) 
+      } else {
+        mer.2020.sig.miss.anova[i-11,j] = round(comb.p[["p"]],2) 
+      }
+    }
+  }
+
+print(mer.2020.sig.miss.anova)
+print(mer.2020.sig.miss.art)
+```
