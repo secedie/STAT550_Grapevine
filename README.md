@@ -1,6 +1,6 @@
 ## Agro-thermal Heat Treatment on Grapevine
 
-PDF report: (TO BE ADDED)
+PDF report: [report.pdf](report.pdf)
 
 ## Analysis code
 
