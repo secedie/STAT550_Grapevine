@@ -86,18 +86,18 @@ library(texreg)
 ```{r check number of left/right censored data}
 # merlot 2019 veraison
 sum(!is.na(merlot2019$veraison)) #observed = 34
-sum(is.na(merlot2019$yield) & is.na(merlot2019$veraison)) #right-censored = 0 
-sum(!is.na(merlot2019$yield) & is.na(merlot2019$veraison)) #left-censored = 26 
+sum(merlot2019$cluster.number==0 & is.na(merlot2019$veraison)) #right-censored = 0 
+sum(merlot2019$cluster.number>0 & is.na(merlot2019$veraison)) #left-censored = 26 
 
 # merlot 2020 veraison
 sum(!is.na(merlot2020$veraison)) #observed = 52
-sum(is.na(merlot2020$yield) & is.na(merlot2020$veraison)) #right-censored = 6 
-sum(!is.na(merlot2020$yield) & is.na(merlot2020$veraison)) #left-censored = 2
+sum(merlot2020$cluster.number==0 & is.na(merlot2020$veraison)) #right-censored = 6 
+sum(merlot2020$cluster.number>0 & is.na(merlot2020$veraison)) #left-censored = 2
 
 # merlot 2020 bloom
 sum(!is.na(merlot2020$bloom)) #observed = 53
-sum(is.na(merlot2020$yield) & is.na(merlot2020$bloom)) #right-censored = 5 
-sum(!is.na(merlot2020$yield) & is.na(merlot2020$bloom)) #left-censored = 2
+sum(merlot2020$cluster.number==0 & is.na(merlot2020$bloom)) #right-censored = 5 
+sum(merlot2020$cluster.number>0 & is.na(merlot2020$bloom)) #left-censored = 2
 ```
 
 ## Left-censored and right-censored
