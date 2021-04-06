@@ -1,0 +1,296 @@
+---
+title: "Censored Data Analysis"
+author: "Naitong Chen, Shirley Cui, Shannon Edie"
+date: "4/6/2021"
+output: word_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Read data
+
+```{r read.data.in}
+chardonnay2019 = read.csv("TanjaVoegel_Chardonnay_2019_data.csv")
+chardonnay2020 = read.csv("TanjaVoegel_Chardonnay_2020_data.csv")
+merlot2019 = read.csv("TanjaVoegel_Merlot_2019_data.csv")
+merlot2020 = read.csv("TanjaVoegel_Merlot_2020_data.csv")
+addition2021 = read.csv("data addition March 8 2021.csv")
+
+# removing extra columns
+merlot2020 = merlot2020[-(61:65),]
+merlot2020 = merlot2020[,-(19:20)]
+merlot2019 = merlot2019[-(61:65),]
+merlot2019 = merlot2019[,-18]
+
+# Make sure the merlot column names are consistent
+colnames(merlot2020)[colnames(merlot2020)=="spad"] = "SPAD"
+
+# encode row, treatment, block, and subsample as factor
+chardonnay2019$row = as.factor(chardonnay2019$row)
+chardonnay2019$treatment = as.factor(chardonnay2019$treatment)
+chardonnay2019$block = as.factor(chardonnay2019$block)
+chardonnay2019$subsample = as.factor(chardonnay2019$subsample)
+
+chardonnay2020$row = as.factor(chardonnay2020$row)
+chardonnay2020$treatment = as.factor(chardonnay2020$treatment)
+chardonnay2020$block = as.factor(chardonnay2020$block)
+chardonnay2020$subsample = as.factor(chardonnay2020$subsample)
+
+merlot2019$row = as.factor(merlot2019$row)
+merlot2019$treatment = as.factor(merlot2019$treatment)
+merlot2019$block = as.factor(merlot2019$block)
+merlot2019$subsample = as.factor(merlot2019$subsample)
+
+
+merlot2020$row = as.factor(merlot2020$row)
+merlot2020$treatment = as.factor(merlot2020$treatment)
+merlot2020$block = as.factor(merlot2020$block)
+merlot2020$subsample = as.factor(merlot2020$subsample)
+
+library(plyr)
+# Add in the additional data
+names(merlot2020)[1] <- "Key"
+merlot2020 <- join(merlot2020, addition2021)
+# detach plyr as it creates conflict with tidyverse
+detach(package:plyr)
+
+```
+
+# Load Packages
+
+```{r packages}
+library(tidyverse)
+library(ggpubr) 
+library(corrplot)
+library(icenReg) # for survival analysis
+library(knitr)
+library(lawstat) # for the levene test
+library(mice)
+library(miceadds)
+library(MKinfer)
+library(rstatix) # for the repeated-measures ANOVA
+library(ARTool) # for aligned rank transform
+library(maditr) # for dcast
+library(pwr2)
+library(plyr) # for rbind.fill
+library(RColorBrewer)
+library(texreg)
+```
+
+# Censored data analysis
+
+```{r check number of left/right censored data}
+# merlot 2019 veraison
+sum(!is.na(merlot2019$veraison)) #observed = 34
+sum(is.na(merlot2019$yield) & is.na(merlot2019$veraison)) #right-censored = 0 
+sum(!is.na(merlot2019$yield) & is.na(merlot2019$veraison)) #left-censored = 26 
+
+# merlot 2020 veraison
+sum(!is.na(merlot2020$veraison)) #observed = 52
+sum(is.na(merlot2020$yield) & is.na(merlot2020$veraison)) #right-censored = 6 
+sum(!is.na(merlot2020$yield) & is.na(merlot2020$veraison)) #left-censored = 2
+
+# merlot 2020 bloom
+sum(!is.na(merlot2020$bloom)) #observed = 53
+sum(is.na(merlot2020$yield) & is.na(merlot2020$bloom)) #right-censored = 5 
+sum(!is.na(merlot2020$yield) & is.na(merlot2020$bloom)) #left-censored = 2
+```
+
+## Left-censored and right-censored
+
+```{r surv.2020}
+# set seed
+set.seed(1)
+
+# Define T1 and T3, the first and last sampling times, for bloom and veraisonCo
+bloom.t1 <- 25
+bloom.t3 <- 31
+ver.t1 <- 31
+ver.t3 <- 36
+
+# First define our dataset of start and end times for our event intervals
+icen.mer20 <- with(merlot2020, {
+  
+  # If the data isn't censored (non-NA bloom), let the start and end be equal to each other
+  icen.mer20 <- data.frame("bloom.start"=bloom, "bloom.end"=bloom,
+                           "verais.start"=veraison, "verais.end"=veraison,
+                           "trt"=treatment, "block"=block,
+                           "verais.indicator"="observed",
+                           "bloom.indicator"="observed")
+
+  # If the data is right-censored (cluster.number==0; event happened after
+  # the study period of interest), then let the "start" be the imputed value
+  # and set the ending value to Inf
+  right.bloom <- is.na(bloom) & cluster.number==0
+  icen.mer20$bloom.start[right.bloom] <- bloom.t3
+  icen.mer20$bloom.end[right.bloom] <- Inf
+  icen.mer20$bloom.indicator[right.bloom] <- "right-censored"
+  
+  right.ver <- is.na(veraison) & cluster.number==0
+  icen.mer20$verais.start[right.ver] <- ver.t3
+  icen.mer20$verais.end[right.ver] <- Inf
+  icen.mer20$verais.indicator[right.ver] <- "right-censored"
+
+  
+  # If the data is left-censored (event happened before we started recording Veraison)
+  # (cluster.number>0), then let the "end" be the imputed value and
+  # set the starting value to -Inf
+  # For veraison, we can set the starting value to the max of -Inf and the 50% bloom date
+  left.bloom <- is.na(bloom) & cluster.number>0
+  icen.mer20$bloom.start[left.bloom] <- -Inf
+  icen.mer20$bloom.end[left.bloom] <- bloom.t1
+  icen.mer20$bloom.indicator[left.bloom] <- "left-censored"
+  
+  left.ver <- is.na(veraison) & cluster.number>0
+  icen.mer20$verais.start[left.ver] <- unlist(lapply(bloom[left.ver]-61, 
+                                                     function(x){max(-Inf, x, na.rm=T)}))
+  icen.mer20$verais.end[left.ver] <- ver.t1
+  icen.mer20$verais.indicator[left.ver] <- "left-censored"
+  
+  # Take note of any interval-censored data
+    icen.mer20$verais.indicator[left.ver & right.ver] <- "interval-censored"
+    icen.mer20$bloom.indicator[left.bloom & right.bloom] <- "interval-censored"
+  
+  return(icen.mer20)
+  
+  })
+
+
+library(icenReg)
+# Build a model for the bloom data
+coxph.bloom20 <- ic_sp(cbind(bloom.start,bloom.end) ~  as.factor(trt) * as.factor(block),
+               data=icen.mer20, model='ph', bs_samples=100)
+
+# Build a model for the veraison data
+coxph.ver20 <- ic_sp(cbind(verais.start,verais.end) ~  as.factor(trt) * as.factor(block),
+               data=icen.mer20, model='ph', bs_samples=100)
+
+
+```
+
+```{r surv.2019}
+
+# First define our dataset of start and end times for our event intervals
+icen.mer19 <- with(merlot2019, {
+  
+  # If the data isn't censored (non-NA bloom), let the start and end be equal to each other
+  icen.mer19 <- data.frame("verais.start"=veraison, "verais.end"=veraison,
+                           "trt"=treatment, "block"=block,
+                           "verais.indicator"=c("observed"))
+
+  # If the data is right-censored (cluster.number==0; event happened after
+  # the study period of interest), then let the "start" be the T3 value
+  # and set the ending value to Inf
+  right.ver <- is.na(merlot2019$veraison) & cluster.number==0
+  icen.mer19$verais.start[right.ver] <- ver.t3
+  icen.mer19$verais.end[right.ver] <- Inf
+  icen.mer19$verais.indicator[right.ver] <- "right-censored"
+  
+  
+  # If the data is left-censored (event happened before we started recording Veraison)
+  # (cluster.number>0), then let the "end" be T3 and
+  # set the starting value to -Inf
+  left.ver <- is.na(merlot2019$veraison) & cluster.number>0
+  icen.mer19$verais.start[left.ver] <- -Inf
+  icen.mer19$verais.end[left.ver] <- ver.t1
+  icen.mer19$verais.indicator[left.ver] <- "left-censored"
+  
+  # Also take note of both left-censored and right-censored data:
+  icen.mer19$verais.indicator[left.ver & right.ver] <- "interval-censored"
+
+  
+  return(icen.mer19)
+  })
+
+# Build a model for the veraison data
+coxph.ver19 <- ic_sp(cbind(verais.start,verais.end) ~ as.factor(trt) * as.factor(block), 
+                  data=icen.mer19, model='ph', bs_samples=100)
+
+
+```
+
+```{r print.summary}
+
+summary(coxph.ver19)
+
+summary(coxph.ver20)
+
+summary(coxph.bloom20)
+```
+
+```{r assumption.check}
+newdata <- data.frame(trt=c(rep("heat", 6), rep("control", 6)), "block"=as.character(1:6))
+rownames(newdata) <- paste(newdata$trt, newdata$block)
+
+plot(coxph.ver19, newdata, main="2019 Veraison", col=brewer.pal(12, 'Paired'), lgdLocation = "bottomleft")
+
+plot(coxph.ver20, newdata, main="2020 Veraison", col=brewer.pal(12, 'Paired'), lgdLocation = "bottomleft")
+
+plot(coxph.bloom20, newdata, main="2020 Bloom", col=brewer.pal(12, 'Paired'), lgdLocation = "bottomleft")
+```
+
+## Censored data analysis -- only right-censored
+
+```{r surv.2020.right.censored}
+
+# Let's consider what happens if we only treat the data as right-censored or observed
+# We will impute T1 for left-censored data
+icen.mer20$bloom.rc <- ifelse(icen.mer20$bloom.start==-Inf, icen.mer20$bloom.end, icen.mer20$bloom.start)
+icen.mer20$verais.rc <- ifelse(icen.mer20$verais.start==-Inf, icen.mer20$verais.end, icen.mer20$verais.start)
+icen.mer20$bloom.indicator.rc <- ifelse(icen.mer20$bloom.indicator=="right-censored", 0, 1)
+icen.mer20$verais.indicator.rc <- ifelse(icen.mer20$verais.indicator=="right-censored", 0, 1)
+
+
+# Build a model for the bloom data
+rc.coxph.bloom20 <- coxph(Surv(bloom.rc,bloom.indicator.rc) ~  
+                         as.factor(trt) * as.factor(block),
+               data=icen.mer20)
+
+# Build a model for the veraison merlot 2020 data
+rc.coxph.ver20 <- coxph(Surv(verais.rc,verais.indicator.rc) ~  
+                         as.factor(trt) * as.factor(block),
+               data=icen.mer20)
+
+# CI
+exp(confint(rc.coxph.ver20))[1,] # 0.9200849 12.1712735
+```
+
+```{r surv.2019.right.censored}
+
+# First define our dataset of start and end times for our event intervals
+icen.mer19$verais.rc <- ifelse(icen.mer19$verais.start==-Inf, icen.mer19$verais.end, icen.mer19$verais.start)
+icen.mer19$verais.indicator.rc <- ifelse(icen.mer19$verais.indicator=="right-censored", 0, 1)
+
+
+# Build a model for the veraison data
+rc.coxph.ver19 <- coxph(Surv(verais.rc,verais.indicator.rc) ~ as.factor(trt) * as.factor(block), 
+                  data=icen.mer19)
+```
+
+```{r print.summary.right.censored}
+summary(rc.coxph.ver19)
+
+summary(rc.coxph.ver20)
+
+summary(rc.coxph.bloom20)
+```
+
+```{r assumption.check.right.censored}
+newdata <- data.frame(trt=c(rep("heat", 6), rep("control", 6)), "block"=as.character(1:6))
+rownames(newdata) <- paste(newdata$trt, newdata$block)
+
+plot(survfit(rc.coxph.ver19, newdata), main="2019 Veraison", col=brewer.pal(12, 'Paired'))
+legend('bottomleft', fill=brewer.pal(12, 'Paired'), legend=rownames(newdata))
+
+plot(survfit(rc.coxph.ver20, newdata), main="2020 Veraison", col=brewer.pal(12, 'Paired'))
+legend('bottomleft', fill=brewer.pal(12, 'Paired'), legend=rownames(newdata))
+
+plot(survfit(rc.coxph.bloom20, newdata), main="2020 Bloom", col=brewer.pal(12, 'Paired'))
+legend('bottomleft', fill=brewer.pal(12, 'Paired'), legend=rownames(newdata))
+```
+
+
